@@ -3,6 +3,7 @@ import json
 import logging
 
 from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
+from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -13,7 +14,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--match_size", default=1, type=int)
     parser.add_argument("--device", type=str, default="cuda:0")
-    parser.add_argument("--output_path", "-o", type="str", default=".")
+    parser.add_argument("--output_path", "-o", type=str, default=".")
     parser.add_argument("--log_samples", "-s", type=bool, default=True)
     parser.add_argument("--system_instruction", type=str, default="")
     parser.add_argument("--apply_chat_template", type=bool, default=False)
@@ -27,7 +28,7 @@ def setup_parser() -> argparse.ArgumentParser:
                         help="If True, run offline analysis of two output files from lm-evaluation-harness.")
     parser.add_argument("--offline_file_1", type=str, default="",
                         help="File path for first model results.")
-    parser.add_argument("--offline_fine_2", type=str, default="",
+    parser.add_argument("--offline_file_2", type=str, default="",
                         help="File path for second model results.")
 
     return parser
@@ -43,14 +44,29 @@ def run_tournament():
     # set up local logger.
     # set up wandb logger.
 
-    # validate tournament parameters.
-    cfg = TournamentConfig()
+    if args.offline == True:
+        # validate tournament parameters.
+        cfg = OfflineTournamentConfig(name="test_offline_tournament",
+                                      offline_file_1=args.offline_file_1,
+                                      offline_file_2=args.offline_file_2,
+                                      task_name="test_task_name",
+                                      rounds=args.num_rounds,
+                                      num_samples=args.match_size
+                                     )
+        # create offline tournament
+        tournament = OfflineTournament(cfg)
 
-    # create tournament
-    tournament = Tournament(cfg)
+        # run tournament evaluator.
+        result = tournament.run_tournament()    
+    else:
+        # validate tournament parameters.
+        cfg = TournamentConfig()
 
-    # run tournament evaluator.
-    result = tournament.run_tournament()
+        # create tournament
+        tournament = Tournament(cfg)
+
+        # run tournament evaluator.
+        result = tournament.run_tournament()
 
     # save tournament results to disk.
 
