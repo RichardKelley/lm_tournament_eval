@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lm-tournament-eval"
+version = "0.0.1"
+description = "A framework for evaluating language models using dataset tournaments."
+readme = "README.md"
+authors = [
+    {name="Richard Kelley", email="richard.kelley@gmail.com"},
+    {name="Duncan Wilson", email="todo@todo.com"}
+]
+license = { "text" = "MIT" }
+
+dependencies = [
+    "datasets>=2.0.0",
+    "torch>=2.0.0"
+]
+
+[project.scripts]
+lm-tournament-eval = "lm_tournament_eval.__main__:run_tournament"
+lm_tournament_eval = "lm_tournament_eval.__main__:run_tournament"
