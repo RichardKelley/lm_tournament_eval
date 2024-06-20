@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass, field
 from .offline_match_scheduler import OfflineMatchSchedulerConfig, OfflineMatchScheduler
+from .task import TaskConfig
+from .match import MatchResult, Match
 import json
 import numpy as np
-
-
 
 @dataclass
 class OfflineTournamentConfig:
@@ -15,6 +15,7 @@ class OfflineTournamentConfig:
     task_name : str
     rounds : int
     num_samples : int
+    task_config : TaskConfig
 
 
 class OfflineTournament:
@@ -35,14 +36,22 @@ class OfflineTournament:
                 self.responses_2.append(json.loads(line))
 
         self.scheduler_cfg = OfflineMatchSchedulerConfig(rounds = config.rounds,
-                                         num_samples = config.num_samples)
+                                                         num_samples = config.num_samples)
         self.scheduler = OfflineMatchScheduler(self.scheduler_cfg)
+        self.match_result_list = [MatchResult(model0_name="test",
+                                              model1_name="test",           
+                                              model0_old_elo=self.score_1,
+                                              model1_old_elo=self.score_2,
+                                              model0_new_elo=self.score_1,
+                                              model1_new_elo=self.score_2,
+                                              task_config=self.config.task_config)
+                                              for i in range(self.config.rounds)]
 
     def run_tournament(self):
-        print("Running tournament!")
-
         # run match
         for n in range(self.config.rounds):
+            self.match_result_list[n].model0_old_elo = self.score_1
+            self.match_result_list[n].model1_old_elo = self.score_2
             # sample indices
             task_indices = self.scheduler.schedule_tournament()
             # calculate the wins, losses, and draws
@@ -74,5 +83,10 @@ class OfflineTournament:
                 self.score_2 = self.score_2 + self.k*(0.5 - expected_score_2)           
             print(f"score_1, 2 {self.score_1}, {self.score_2}")
             print("----------------------------")
+            
+            self.match_result_list[n].model0_new_elo = self.score_1
+            self.match_result_list[n].model1_new_elo = self.score_2
+            
+            
         return {}
 

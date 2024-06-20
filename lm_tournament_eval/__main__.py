@@ -4,6 +4,7 @@ import logging
 
 from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
 from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
+from lm_tournament_eval.api.task import TaskConfig
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -46,12 +47,14 @@ def run_tournament():
 
     if args.offline == True:
         # validate tournament parameters.
+        task_config = TaskConfig()
         cfg = OfflineTournamentConfig(name="test_offline_tournament",
                                       offline_file_1=args.offline_file_1,
                                       offline_file_2=args.offline_file_2,
                                       task_name="test_task_name",
                                       rounds=args.num_rounds,
-                                      num_samples=args.match_size
+                                      num_samples=args.match_size,
+                                      task_config=task_config
                                      )
         # create offline tournament
         tournament = OfflineTournament(cfg)
