@@ -10,8 +10,8 @@ import numpy as np
 @dataclass
 class OfflineTournamentConfig:
     name : str
+    offline_file_0 : str
     offline_file_1 : str
-    offline_file_2 : str
     task_name : str
     rounds : int
     num_samples : int
@@ -30,10 +30,10 @@ class OfflineTournament:
         # read the offline results in 
         self.responses_0 = []
         self.responses_1 = []
-        with open(config.offline_file_1, 'r') as file:
+        with open(config.offline_file_0, 'r') as file:
             for line in file:
                 self.responses_0.append(json.loads(line))
-        with open(config.offline_file_2, 'r') as file:
+        with open(config.offline_file_1, 'r') as file:
             for line in file:
                 self.responses_1.append(json.loads(line))
 

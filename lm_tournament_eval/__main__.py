@@ -10,8 +10,8 @@ from lm_tournament_eval.api.task import TaskConfig
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model0", "-m1", type=str, help="Name of first competing model.")
-    parser.add_argument("--model1", "-m2", type=str, help="Name of second competing model.")
+    parser.add_argument("--model0", "-m0", type=str, help="Name of first competing model.")
+    parser.add_argument("--model1", "-m1", type=str, help="Name of second competing model.")
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--match_size", default=1, type=int)
@@ -29,9 +29,9 @@ def setup_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--offline", type=bool, default=False, 
                         help="If True, run offline analysis of two output files from lm-evaluation-harness.")
-    parser.add_argument("--offline_file_1", type=str, default="",
+    parser.add_argument("--offline_file_0", type=str, default="",
                         help="File path for first model results.")
-    parser.add_argument("--offline_file_2", type=str, default="",
+    parser.add_argument("--offline_file_1", type=str, default="",
                         help="File path for second model results.")
 
     return parser
@@ -53,8 +53,8 @@ def run_tournament():
         # validate tournament parameters.
         task_config = TaskConfig()
         cfg = OfflineTournamentConfig(name=args.tournament_name,
+                                      offline_file_0=args.offline_file_0,
                                       offline_file_1=args.offline_file_1,
-                                      offline_file_2=args.offline_file_2,
                                       task_name=args.tasks,
                                       rounds=args.num_rounds,
                                       num_samples=args.match_size,
