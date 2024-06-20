@@ -16,6 +16,8 @@ class OfflineTournamentConfig:
     rounds : int
     num_samples : int
     task_config : TaskConfig
+    model_0_name : str
+    model_1_name : str
 
 
 class OfflineTournament:
@@ -38,8 +40,8 @@ class OfflineTournament:
         self.scheduler_cfg = OfflineMatchSchedulerConfig(rounds = config.rounds,
                                                          num_samples = config.num_samples)
         self.scheduler = OfflineMatchScheduler(self.scheduler_cfg)
-        self.match_result_list = [MatchResult(model0_name="test",
-                                              model1_name="test",           
+        self.match_result_list = [MatchResult(model0_name=self.config.model_0_name,
+                                              model1_name=self.config.model_1_name,           
                                               model0_old_elo=self.score_1,
                                               model1_old_elo=self.score_2,
                                               model0_new_elo=self.score_1,

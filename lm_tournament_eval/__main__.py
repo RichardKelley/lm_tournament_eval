@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import datetime
 
 from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
 from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
@@ -9,13 +10,14 @@ from lm_tournament_eval.api.task import TaskConfig
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model1", "-m1", type=str, help="Name of first competing model.")
-    parser.add_argument("--model2", "-m2", type=str, help="Name of second competing model.")
+    parser.add_argument("--model0", "-m1", type=str, help="Name of first competing model.")
+    parser.add_argument("--model1", "-m2", type=str, help="Name of second competing model.")
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--match_size", default=1, type=int)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output_path", "-o", type=str, default=".")
+    parser.add_argument("--tournament_name", type=str, default="")
     parser.add_argument("--log_samples", "-s", type=bool, default=True)
     parser.add_argument("--system_instruction", type=str, default="")
     parser.add_argument("--apply_chat_template", type=bool, default=False)
@@ -42,19 +44,23 @@ def run_tournament():
     parser = setup_parser()
     args = parser.parse_args()
 
+    args.tournament_name = "{}-{}-{}".format(datetime.datetime.now(), args.model0, args.model1)
+    
     # set up local logger.
     # set up wandb logger.
 
     if args.offline == True:
         # validate tournament parameters.
         task_config = TaskConfig()
-        cfg = OfflineTournamentConfig(name="test_offline_tournament",
+        cfg = OfflineTournamentConfig(name=args.tournament_name,
                                       offline_file_1=args.offline_file_1,
                                       offline_file_2=args.offline_file_2,
-                                      task_name="test_task_name",
+                                      task_name=args.tasks,
                                       rounds=args.num_rounds,
                                       num_samples=args.match_size,
-                                      task_config=task_config
+                                      task_config=task_config,
+                                      model_0_name = args.model0,
+                                      model_1_name = args.model1
                                      )
         # create offline tournament
         tournament = OfflineTournament(cfg)
