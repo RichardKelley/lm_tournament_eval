@@ -38,7 +38,7 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def run_tournament():
-    print("Running tournament!")
+    # print("Running tournament!")
 
     # handle arguments.
     parser = setup_parser()
@@ -59,8 +59,8 @@ def run_tournament():
                                       rounds=args.num_rounds,
                                       num_samples=args.match_size,
                                       task_config=task_config,
-                                      model_0_name = args.model0,
-                                      model_1_name = args.model1
+                                      model0_name = args.model0,
+                                      model1_name = args.model1
                                      )
         # create offline tournament
         tournament = OfflineTournament(cfg)
@@ -69,7 +69,12 @@ def run_tournament():
         result = tournament.run_tournament()    
     else:
         # validate tournament parameters.
-        cfg = TournamentConfig()
+        cfg = TournamentConfig(name=args.tournament_name,
+                               rounds=args.num_rounds,
+                               model0_name = args.model0,
+                               model1_name = args.model1,
+                               task_name=args.tasks
+                              )
 
         # create tournament
         tournament = Tournament(cfg)
