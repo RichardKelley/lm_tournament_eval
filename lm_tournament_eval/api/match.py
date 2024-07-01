@@ -19,13 +19,13 @@ class MatchResult:
     task_config : TaskConfig
 
     task_indices : List[int] = field(
-        default=[],
-        metadata={"doc" : "Indices from the task that make up the match"}
+        metadata={"doc" : "Indices from the task that make up the match"},
+        default_factory=list
     )
 
     match_points : List[int] = field(
-        default=[],
-        metadata={"doc" : "Array of winner for each 'point' - model 0 or model 1."}
+       metadata={"doc" : "Array of winner for each 'point' - model 0 or model 1."},
+       default_factory=list
     )
 
 class Match:
