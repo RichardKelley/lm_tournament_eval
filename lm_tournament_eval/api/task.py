@@ -2,7 +2,7 @@ import datasets
 from dataclasses import dataclass, field
 from typing import Optional, Union
 
-from lm_tournament_eval.api.instance import OutputType, Instance
+from .instance import OutputType, Instance
 
 @dataclass
 class TaskConfig:
