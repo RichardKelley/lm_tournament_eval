@@ -1,6 +1,6 @@
 from datasets import load_dataset
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 
 import logging
 
@@ -56,3 +56,6 @@ class Task:
                                                    arguments=(req['ctx'],ending),
                                                    idx=i
                                                   ))
+                
+    def process_results(self, doc, results) -> Dict:
+        return {}
