@@ -13,4 +13,10 @@ class TaskManager:
         self.include_path = include_path
         self.include_defaults = include_defaults
 
-        
+        self._task_list = self.initialize_tasks(
+            include_path=self.include_path, include_defaults=self.include_defaults
+        )
+
+    def initialize_tasks(self, include_path, include_defaults):
+        # TODO
+        pass
