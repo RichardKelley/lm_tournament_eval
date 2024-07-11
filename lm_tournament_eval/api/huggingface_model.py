@@ -1,4 +1,4 @@
-from model import LM
+from .model import LM
 
 import torch
 import torch.nn.functional as F
@@ -8,7 +8,7 @@ from transformers import PreTrainedModel, PreTrainedTokenizer, AutoTokenizer
 
 import copy
 
-from lm_utils import (
+from .lm_utils import (
     get_rolling_token_windows,
     make_disjoint_window,
     Collator,
@@ -155,6 +155,16 @@ class HFLM(LM):
         )
 
         return None
+
+    def to(self, new_device) -> None:
+        assert new_device in ["cpu", "cuda"] # How will this work with multiple GPUs?
+        if not hasattr(self._model.config, "quantization_config"): # has to be a no-op for quantized models - to(...) fails.
+            match new_device:
+                case "cpu":
+                        self._model = self._model.to(new_device)
+                        torch.cuda.empty_cache()
+                case "cuda":
+                    self._model = self._model.to(new_device)
 
     @property
     def model(self):
