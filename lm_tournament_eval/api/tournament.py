@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from .task import Task, TaskConfig
 
-from .tasks import TaskManager
+from lm_tournament_eval.tasks import TaskManager
 
 @dataclass
 class TournamentConfig:
