@@ -5,7 +5,6 @@ import evaluate as hf_evaluate
 
 from lm_tournament_eval.api.model import LM
 
-
 eval_logger = logging.getLogger("lm-eval")
 
 MODEL_REGISTRY = {}

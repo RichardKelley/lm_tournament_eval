@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, Union
 
-from lm_eval.api.instance import Instance
+from lm_tournament_eval.api.instance import Instance
 
 
 class Filter(ABC):

@@ -13,6 +13,14 @@ from lm_tournament_eval.api.metrics import (
 from lm_tournament_eval.api.task import Task
 from lm_tournament_eval.utils import eval_logger, positional_deprecated
 
+def request_caching_arg_to_dict(cache_requests: str) -> dict:
+    request_caching_args = {
+        "cache_requests": cache_requests in {"true", "refresh"},
+        "rewrite_requests_cache": cache_requests == "refresh",
+        "delete_requests_cache": cache_requests == "delete",
+    }
+
+    return request_caching_args
 
 class TaskOutput:
     """

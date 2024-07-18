@@ -488,12 +488,12 @@ class TaskManager:
                         for attr in ["tag", "group"]:
                             if attr in config:
                                 if attr == "group" and print_info:
-                                    self.logger.info(
-                                        "`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lm-eval. "
-                                        "`tag` will be used to allow to call a collection of tasks just like `group`. "
-                                        "`group` will be removed in order to not cause confusion with the new ConfigurableGroup "
-                                        "which will be the offical way to create groups with addition of group-wide configuations."
-                                    )
+                                    #self.logger.info(
+                                    #    "`group` and `group_alias` keys in tasks' configs will no longer be used in the next release of lm-eval. "
+                                    #    "`tag` will be used to allow to call a collection of tasks just like `group`. "
+                                    #    "`group` will be removed in order to not cause confusion with the new ConfigurableGroup "
+                                    #    "which will be the offical way to create groups with addition of group-wide configuations."
+                                    #)
                                     print_info = False
                                     # attr = "tag"
 

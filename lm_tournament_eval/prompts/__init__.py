@@ -2,8 +2,8 @@ import ast
 import os
 from typing import Dict
 
-from lm_eval import utils
-from lm_eval.utils import eval_logger
+from lm_tournament_eval import utils
+from lm_tournament_eval.utils import eval_logger
 
 
 # Prompt library.
