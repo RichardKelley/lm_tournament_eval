@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Optional, Union, Dict, List
+from typing import Optional, Union, Dict, List, Tuple
 import random
 import json
 from collections import defaultdict
@@ -16,6 +16,12 @@ import lm_tournament_eval.api.task
 import lm_tournament_eval.models
 
 from lm_tournament_eval.loggers import EvaluationTracker
+from lm_tournament_eval.loggers.utils import (
+     add_env_info, 
+     add_tokenizer_info, 
+     get_git_commit_hash
+)
+
 from lm_tournament_eval.tasks import (
     TaskManager,
     get_task_dict
@@ -73,7 +79,7 @@ def tournament_evaluate(
     numpy_random_seed: int = 1234,
     torch_random_seed: int = 1234,
     fewshot_random_seed: int = 1234
-) -> Dict:
+) -> Tuple[Dict, Dict]:
     
     start_date = time.time()
 
@@ -154,9 +160,47 @@ def tournament_evaluate(
         logging.info("Using pre-initialized model")
         lm0 = model0
 
-    # We don't currently support CachingLM
+    # now do model1
+    if isinstance(model1, str):
+        if model1_args is None:
+            logging.warning("model1_args not specified. Using defaults")
+            model1_args = ""
 
-    # TODO LOAD MODEL1 to CPU
+        if isinstance(model1_args, dict):
+            model1_args.update({"model": model1})
+            logging.info(
+                f"Initializing {model1} model, with arguments: {model1_args}."
+            )
+
+            lm1 = lm_tournament_eval.api.registry.get_model(model_type).create_from_arg_obj(
+                model1_args,
+                {
+                    "batch_size" : batch_size,
+                    "max_batch_size" : max_batch_size,
+                    "device":  device,
+                },
+            )
+            
+        else:
+            model1_args += f"model={model1}"
+            logging.info(
+                f"Initializing {model1} model, with arguments: {simple_parse_args_string(model1_args)}"
+            )
+            lm1 = lm_tournament_eval.api.registry.get_model(model_type).create_from_arg_string(
+                model1_args,
+                {
+                    "batch_size": batch_size,
+                    "max_batch_size": max_batch_size,
+                    "device": device,
+                }
+            )
+    else:
+        if not isinstance(model1, lm_tournament_eval.api.model.LM):
+            raise TypeError
+        logging.info(f"Using pre-initialized model for model 1.")
+        lm1 = model1
+
+    # We don't currently support CachingLM
 
     if task_manager is None:
         task_manager = TaskManager(verbosity)
@@ -218,13 +262,102 @@ def tournament_evaluate(
 
     task_dict = _adjust_config(task_dict)
 
-    results = evaluate(
+    results0 = evaluate(
         lm=lm0,
         task_dict=task_dict,
         limit=limit,
     )
 
-    print(results)
+    results1 = evaluate(
+        lm=lm1,
+        task_dict=task_dict,
+        limit=limit
+    )
+
+    # post-process results0 and results1
+    if lm0.rank == 0:
+        if isinstance(model0, str):
+            model0_name = model0
+        elif hasattr(model0, "config") and hasattr(model0.config, "_name_or_path"):
+            model0_name = model0.config._name_or_path
+        else:
+            model0_name = type(model0).__name__
+
+        results0["config"] = {
+            "model0": model0_name,
+            "model0_args": model0_args,
+        }
+
+        if isinstance(lm0, lm_tournament_eval.models.huggingface_model.HFLM):
+            results0["config"].update(lm0.get_model_info())
+
+        results0["config"].update(
+            {
+                "batch_size": batch_size,
+                "batch_sizes": (
+                    list(lm0.batch_sizes.values()) if hasattr(lm0, "batch_sizes") else []
+                ),
+                "device": device,
+                "use_cache": use_cache,
+                "limit": limit,
+                "bootstrap_iters": bootstrap_iters,
+                "gen_kwargs": gen_kwargs,
+                "random_seed": random_seed,
+                "numpy_seed": numpy_random_seed,
+                "torch_seed": torch_random_seed,
+                "fewshot_seed": fewshot_random_seed,
+            }
+        )
+
+        results0["git_hash"] = get_git_commit_hash()
+        results0["date"] = start_date
+        add_env_info(results0)  # additional environment info to results
+        add_tokenizer_info(results0, lm0)  # additional info about tokenizer
+    else:
+        return None
+
+    if lm1.rank == 0:
+        if isinstance(model1, str):
+            model1_name = model1
+        elif hasattr(model1, "config") and hasattr(model1.config, "_name_or_path"):
+            model1_name = model1.config._name_or_path
+        else:
+            model1_name = type(model1).__name__
+
+        results1["config"] = {
+            "model1": model1_name,
+            "model1_args": model1_args,
+        }
+
+        if isinstance(lm1, lm_tournament_eval.models.huggingface_model.HFLM):
+            results1["config"].update(lm1.get_model_info())
+
+        results1["config"].update(
+            {
+                "batch_size": batch_size,
+                "batch_sizes": (
+                    list(lm1.batch_sizes.values()) if hasattr(lm1, "batch_sizes") else []
+                ),
+                "device": device,
+                "use_cache": use_cache,
+                "limit": limit,
+                "bootstrap_iters": bootstrap_iters,
+                "gen_kwargs": gen_kwargs,
+                "random_seed": random_seed,
+                "numpy_seed": numpy_random_seed,
+                "torch_seed": torch_random_seed,
+                "fewshot_seed": fewshot_random_seed,
+            }
+        )
+
+        results1["git_hash"] = get_git_commit_hash()
+        results1["date"] = start_date
+        add_env_info(results1)  # additional environment info to results
+        add_tokenizer_info(results1, lm1)  # additional info about tokenizer
+    else:
+        return None
+    
+    return (results0, results1)
 
 def evaluate(
     lm: "LM",

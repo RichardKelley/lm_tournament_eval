@@ -167,7 +167,7 @@ def run_tournament():
 
         #logging.info(f"Running tournament {cfg}")
 
-        results = tournament_evaluate(
+        results0, results1 = tournament_evaluate(
             model_type="hf",
             model0=args.model0,
             model1=args.model1,
@@ -178,12 +178,11 @@ def run_tournament():
             limit=args.limit,
         )
 
-        # run tournament evaluator.
-        #result = tournament.run_tournament()
+        newline = '\n'
+        print(f"{results0}{newline*10}{results1}")
 
     # save tournament results to disk.
 
-    print("done!")
 
 if __name__ == "__main__":
     run_tournament()
