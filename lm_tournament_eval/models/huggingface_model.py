@@ -1,4 +1,4 @@
-from .model import LM
+from lm_tournament_eval.api.model import LM
 
 import torch
 import torch.nn.functional as F
@@ -6,9 +6,11 @@ import torch.nn.functional as F
 import transformers
 from transformers import PreTrainedModel, PreTrainedTokenizer, AutoTokenizer
 
+from lm_tournament_eval.api.registry import register_model
+
 import copy
 
-from .lm_utils import (
+from ..api.lm_utils import (
     get_rolling_token_windows,
     make_disjoint_window,
     Collator,
@@ -26,6 +28,7 @@ def get_dtype(dtype: Union[str, torch.dtype]) -> torch.dtype:
         _torch_dtype = dtype
     return _torch_dtype
 
+@register_model("hf-auto", "hf", "huggingface")
 class HFLM(LM):
 
     AUTO_MODEL_CLASS = None # this is set in _get_backend
@@ -240,7 +243,7 @@ class HFLM(LM):
         requests is a list of (context, continuation) pairs
         '''
         new_reqs = []
-        for context, continuation in requests:
+        for context, continuation in [req.args for req in requests]:
             if context == '':
                 context_enc, continuation_enc = (
                     [self.prefix_token_id],

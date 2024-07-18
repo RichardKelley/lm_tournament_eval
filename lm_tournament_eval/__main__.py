@@ -11,13 +11,17 @@ from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, O
 from lm_tournament_eval.api.task import TaskConfig
 from lm_tournament_eval.tasks import TaskManager
 
+from lm_tournament_eval.tournament_evaluator import tournament_evaluate
+
 from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--model0", "-m0", type=str, help="Name of first competing model.")
+    parser.add_argument("--model0_args", type=str, help="Arguments for model 0.")
     parser.add_argument("--model1", "-m1", type=str, help="Name of second competing model.")
+    parser.add_argument("--model1_args", type=str, help="Arguments for model 1.")
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--match_size", default=1, type=int)
@@ -37,6 +41,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trust_remote_code",
                         action="store_true",
                         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub")
+    parser.add_argument("--limit", type=int)
 
     parser.add_argument("--offline", type=bool, default=False, 
                         help="If True, run offline analysis of two output files from lm-evaluation-harness.")
@@ -120,9 +125,10 @@ def run_tournament():
 
     logging.info(f"Selected Tasks: {task_names}")
 
-    request_caching_args = request_caching_arg_to_dict(
-        cache_requests=args.cache_requests
-    )
+    # TODO support caching?
+    #request_caching_args = request_caching_arg_to_dict(
+    #    cache_requests=args.cache_requests
+    #)
 
     args.tournament_name = "{}-{}-{}".format(datetime.datetime.now(), args.model0, args.model1)
     
@@ -149,20 +155,31 @@ def run_tournament():
         result = tournament.run_tournament()    
     else:
         # validate tournament parameters.
-        cfg = TournamentConfig(name=args.tournament_name,
-                               rounds=args.num_rounds,
-                               model0_name = args.model0,
-                               model1_name = args.model1,
-                               task_name=args.tasks
-                              )
+        #cfg = TournamentConfig(name=args.tournament_name,
+        #                       rounds=args.num_rounds,
+        #                       model0_name = args.model0,
+        #                       model1_name = args.model1,
+        #                       task_name=args.tasks
+        #                      )
 
         # create tournament
-        tournament = Tournament(cfg)
+        #tournament = Tournament(cfg)
 
-        logging.info(f"Running tournament {cfg}")
+        #logging.info(f"Running tournament {cfg}")
+
+        results = tournament_evaluate(
+            model_type="hf",
+            model0=args.model0,
+            model1=args.model1,
+            model0_args=args.model0_args,
+            model1_args=args.model1_args,
+            tasks=task_names,
+            task_manager=task_manager,
+            limit=args.limit,
+        )
 
         # run tournament evaluator.
-        result = tournament.run_tournament()
+        #result = tournament.run_tournament()
 
     # save tournament results to disk.
 
