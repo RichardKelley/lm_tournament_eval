@@ -5,6 +5,8 @@ import random
 import json
 from collections import defaultdict
 
+import itertools
+
 import numpy as np
 
 import torch
@@ -12,8 +14,10 @@ import torch
 import lm_tournament_eval.api.registry
 import lm_tournament_eval.api.metrics
 import lm_tournament_eval.api.task
+from lm_tournament_eval.api.task import Task
 
 import lm_tournament_eval.models
+from lm_tournament_eval.api.model import LM
 
 from lm_tournament_eval.loggers import EvaluationTracker
 from lm_tournament_eval.loggers.utils import (
@@ -360,7 +364,7 @@ def tournament_evaluate(
     return (results0, results1)
 
 def evaluate(
-    lm: "LM",
+    lm: LM,
     task_dict,
     limit: Optional[int] = None,
     cache_requests: bool = False,
