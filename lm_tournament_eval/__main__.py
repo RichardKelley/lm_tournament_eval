@@ -10,6 +10,7 @@ from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
 from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
 from lm_tournament_eval.api.task import TaskConfig
 from lm_tournament_eval.tasks import TaskManager
+from lm_tournament_eval.api.elo import ELO
 
 from lm_tournament_eval.tournament_evaluator import tournament_evaluate
 
@@ -182,7 +183,9 @@ def run_tournament():
         )
 
         newline = '\n'
-        print(f"{results0}{newline*10}{results1}")
+        # print(f"{results0}{newline*10}{results1}")
+        elo = ELO()
+        elo.elo_update(results0, results1, task_names)
 
     # save tournament results to disk.
 
