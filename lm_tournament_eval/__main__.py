@@ -24,6 +24,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model1_args", type=str, help="Arguments for model 1.")
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
     parser.add_argument("--num_rounds", default=1, type=int)
+    parser.add_argument("--batch_size", "-b", default=1, type=int)
     parser.add_argument("--match_size", default=1, type=int)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output_path", "-o", type=str, default=".")
@@ -176,6 +177,7 @@ def run_tournament():
             tasks=task_names,
             task_manager=task_manager,
             limit=args.limit,
+            batch_size=args.batch_size
         )
 
         newline = '\n'
