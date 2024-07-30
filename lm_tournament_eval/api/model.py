@@ -6,6 +6,8 @@ from lm_tournament_eval import utils
 
 T = TypeVar("T", bound="LM")
 
+import logging
+
 class LM(abc.ABC):
 
     def __init__(self) -> None:
@@ -34,7 +36,7 @@ class LM(abc.ABC):
 
     @classmethod
     def create_from_arg_string(
-        cls: Type[T], arg_string, str, additional_config: Optional[dict] = None
+        cls: Type[T], arg_string: str, additional_config: Optional[dict] = None
     ) -> T:
         additional_config = {} if additional_config is None else additional_config
         args = utils.simple_parse_args_string(arg_string)
@@ -49,5 +51,4 @@ class LM(abc.ABC):
         additional_config = {
             k: v for k, v in additional_config.items() if v is not None
         }
-
         return cls(**arg_dict, **additional_config)

@@ -177,7 +177,8 @@ def run_tournament():
             tasks=task_names,
             task_manager=task_manager,
             limit=args.limit,
-            batch_size=args.batch_size
+            batch_size=args.batch_size,
+            device=args.device
         )
 
         newline = '\n'
