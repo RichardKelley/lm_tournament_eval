@@ -295,7 +295,7 @@ class HFLM(LM):
         re_ord = Collator(
             requests,
             sort_fn=_collate,
-            group_by="contexts",
+            group_by=None,
             group_fn=_lookup_one_token_cont,
         )
 
@@ -487,7 +487,7 @@ class HFLM(LM):
         re_ords = Collator(
             requests,
             sort_fn=_collate,
-            group_by="gen_kwargs",
+            group_by=None,
             group_fn=lambda x: x[1],
         )
 
