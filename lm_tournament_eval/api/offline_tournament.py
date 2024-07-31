@@ -16,8 +16,8 @@ class OfflineTournamentConfig:
     rounds : int
     num_samples : int
     task_config : TaskConfig
-    model_0_name : str
-    model_1_name : str
+    model0_name : str
+    model1_name : str
 
 
 class OfflineTournament:
