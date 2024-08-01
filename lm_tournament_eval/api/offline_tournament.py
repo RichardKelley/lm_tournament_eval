@@ -6,6 +6,8 @@ from .task import TaskConfig
 from .match import MatchResult, Match
 import json
 import numpy as np
+from lm_tournament_eval.api.elo import ELO
+
 
 @dataclass
 class OfflineTournamentConfig:
@@ -23,10 +25,6 @@ class OfflineTournamentConfig:
 class OfflineTournament:
     def __init__(self, config : OfflineTournamentConfig):
         self.config = config
-        # set the initial scores
-        self.score_0 = 1200
-        self.score_1 = 1200
-        self.k = 16
         # read the offline results in 
         self.responses_0 = []
         self.responses_1 = []
@@ -50,45 +48,13 @@ class OfflineTournament:
                                               for i in range(self.config.rounds)]
 
     def run_tournament(self):
-        # run match
+        elo = ELO()
         for n in range(self.config.rounds):
-            self.match_result_list[n].model0_old_elo = self.score_0
-            self.match_result_list[n].model1_old_elo = self.score_1
-            # sample indices
+            self.match_result_list[n].model0_old_elo = elo.score_0
+            self.match_result_list[n].model1_old_elo = elo.score_1
             task_indices = self.scheduler.schedule_tournament()
-            # calculate the wins, losses, and draws
-            as_1 = []
-            as_2 = []
-            for i in task_indices:
-                # draw
-                if self.responses_0[i]['acc'] == self.responses_1[i]['acc']:
-                    as_1.append(0)
-                    as_2.append(0)
-                # model 1 won 
-                elif self.responses_0[i]['acc'] > self.responses_1[i]['acc']:
-                    as_1.append(1)
-                # model 2 won
-                elif self.responses_0[i]['acc'] < self.responses_1[i]['acc']:
-                    as_2.append(1)
-            expected_score_0 = 1/(1+10**((self.score_0-self.score_1)/400))
-            expected_score_1 = 1/(1+10**((self.score_1-self.score_0)/400))
-            
-            # update Elo
-            if sum(as_1) > sum(as_2):
-                self.score_0 = self.score_0 + self.k*(1 - expected_score_0)
-                self.score_1 = self.score_1 + self.k*(0 - expected_score_1)
-            elif sum(as_2) > sum(as_1):
-                self.score_0 = self.score_0 + self.k*(0 - expected_score_0)
-                self.score_1 = self.score_1 + self.k*(1 - expected_score_1)
-            elif sum(as_1) == sum(as_2):
-                self.score_0 = self.score_0 + self.k*(0.5 - expected_score_0)
-                self.score_1 = self.score_1 + self.k*(0.5 - expected_score_1)           
-            print(f"score_0, 1 {self.score_0}, {self.score_1}")
-            print("----------------------------")
-            
-            self.match_result_list[n].model0_new_elo = self.score_0
-            self.match_result_list[n].model1_new_elo = self.score_1
-            
-            
+            elo.offline_elo_update(self.responses_0, self.responses_1, task_names, task_indices)
+            self.match_result_list[n].model0_new_elo = elo.score_0
+            self.match_result_list[n].model1_new_elo = elo.score_1
         return {}
 
