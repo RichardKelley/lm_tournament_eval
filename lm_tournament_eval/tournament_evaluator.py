@@ -16,11 +16,6 @@ import lm_tournament_eval.api.task
 import lm_tournament_eval.models
 
 from lm_tournament_eval.loggers import EvaluationTracker
-from lm_tournament_eval.loggers.utils import (
-     add_env_info, 
-     add_tokenizer_info, 
-     get_git_commit_hash
-)
 
 from lm_tournament_eval.caching.cache import delete_cache
 
@@ -47,6 +42,7 @@ def evaluate(
     lm: "LM",
     requests,
     eval_tasks,
+    task_dict,
     limit: Optional[int] = None,
     cache_requests: bool = False,
     rewrite_requests_cache: bool = False,

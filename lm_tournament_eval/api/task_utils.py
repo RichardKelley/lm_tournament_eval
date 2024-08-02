@@ -10,17 +10,21 @@ from lm_tournament_eval.evaluator_utils import (
     get_sample_size
 )
 
-
-
 from lm_tournament_eval.utils import eval_logger
 from collections import defaultdict
 from typing import Optional, Union, Dict, List, Tuple
 
 
-def create_requests(tasks, task_manager, verbosity, limit, 
+def create_requests(lm, tasks, task_manager, verbosity, limit, 
                     predict_only: bool = False, 
                     num_fewshot: Optional[int] = None,
                     fewshot_random_seed: int = 1234,
+                    cache_requests: bool = False,
+                    rewrite_requests_cache: bool = False,
+                    apply_chat_template: bool = False,
+                    fewshot_as_multiturn: bool = False,
+                    system_instruction: Optional[str] = None,
+                    write_out: bool = False,
                     log_samples: bool = True    
     ):
     if task_manager is None:
@@ -133,4 +137,4 @@ def create_requests(tasks, task_manager, verbosity, limit,
             reqtype = instance.request_type
             requests[reqtype].append(instance)
     
-    return requests, eval_tasks
+    return requests, eval_tasks, task_dict
