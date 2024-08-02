@@ -20,7 +20,7 @@ class ELO:
         answers0 = [] 
         for task_name in task_names:
             for result in results0["samples"][task_name]:
-                nll = [response[0] for response in result["resps"]]
+                nll = [response[0][0] for response in result["resps"]]
                 prediction = argmax(nll)
                 if prediction == result["target"]:
                     answers0.append(1)
