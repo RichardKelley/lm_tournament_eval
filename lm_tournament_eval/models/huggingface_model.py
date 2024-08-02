@@ -20,6 +20,8 @@ from ..api.lm_utils import (
     stop_sequences_criteria
 )
 
+from tqdm import tqdm
+
 from typing import List, Tuple, Union, Optional
 
 # from lm_eval/models/utils.py
@@ -302,6 +304,11 @@ class HFLM(LM):
         batch_size = self.batch_size
         chunks = re_ord.get_batched(n=batch_size, batch_fn=None)
 
+        pbar = tqdm(
+            total=len(requests),
+            desc="Running loglikelihood requests",
+        )
+
         for chunk in chunks:
             inps = []
             cont_toks_list = []
@@ -368,6 +375,8 @@ class HFLM(LM):
 
                         answer = (float(logits.sum()), bool(max_equal))
                         res.append(answer)
+                        pbar.update(1)
+        pbar.close()
 
         return re_ord.get_original(res)
             
