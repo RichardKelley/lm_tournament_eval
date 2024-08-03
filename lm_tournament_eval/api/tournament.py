@@ -29,7 +29,9 @@ from lm_tournament_eval.loggers.utils import (
 class TournamentConfig:
     name : str
     model0_name : str
+    model0_args : str
     model1_name : str
+    model1_args : str
     task_names : str
     rounds : int
     batch_size : int
@@ -164,8 +166,12 @@ class Tournament:
         #TODO: create function that initializes the models; ie. rip the code out of tournament_evaluate
         #      pass the one of the models into create requests
 
-        model0, model1 = load_models("hf", self.config.model0_name, {}, #self.config.model0_args,
-                                     self.config.model1_name, {}, batch_size=self.config.batch_size, max_batch_size=self.config.batch_size) #self.config.model1_args)
+        model0, model1 = load_models("hf", self.config.model0_name,
+                                     self.config.model0_args,
+                                     self.config.model1_name,
+                                     self.config.model1_args,
+                                     batch_size=self.config.batch_size,
+                                     max_batch_size=self.config.batch_size)
 
         requests0, eval_tasks0, task_dict0 = create_requests(
                 model0,
@@ -192,7 +198,7 @@ class Tournament:
                 model_type="hf",
                 model=self.config.model0_name,
                 lm=model0,
-                model_args={}, #self.config.model0_args,
+                model_args=self.config.model0_args,
                 requests=requests0,
                 eval_tasks=eval_tasks0,
                 task_dict=task_dict0,
@@ -204,7 +210,7 @@ class Tournament:
                 model_type="hf",
                 model=self.config.model1_name, 
                 lm=model1,
-                model_args=  {}, #self.config.model1_args,
+                model_args=self.config.model1_args,
                 requests=requests1,
                 eval_tasks=eval_tasks1,
                 task_dict=task_dict1,

@@ -155,8 +155,10 @@ def run_tournament():
         # validate tournament parameters.
         cfg = TournamentConfig(name=args.tournament_name,
                               rounds=args.num_rounds,
-                              model0_name = args.model0,
-                              model1_name = args.model1,
+                              model0_name=args.model0,
+                              model0_args=args.model0_args,
+                              model1_name=args.model1,
+                              model1_args=args.model1_args,
                               task_names=task_names,
                               batch_size=args.batch_size,
                               device=args.device,

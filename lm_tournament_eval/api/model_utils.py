@@ -1,6 +1,9 @@
 import logging
 import lm_tournament_eval.models
 from lm_tournament_eval.api.registry import get_model
+from lm_tournament_eval.utils import (
+   simple_parse_args_string
+)
 
 def load_models(model_type, model0, model0_args, model1, model1_args, batch_size: int = 1,
                 max_batch_size: int = 1, device: str = "cuda:0"):
