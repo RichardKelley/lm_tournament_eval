@@ -1,14 +1,9 @@
-import time
 import logging
-from typing import Optional, Union, Dict, List, Tuple
-import random
+from typing import Optional
 import json
 from collections import defaultdict
 
 import itertools
-
-import numpy as np
-
 import torch
 
 import lm_tournament_eval.api.registry
@@ -19,27 +14,17 @@ from lm_tournament_eval.api.task import Task
 import lm_tournament_eval.models
 from lm_tournament_eval.api.model import LM
 
-from lm_tournament_eval.loggers import EvaluationTracker
-
-from lm_tournament_eval.caching.cache import delete_cache
-
 from lm_tournament_eval.utils import (
     eval_logger,
     handle_non_serializable,
     hash_string,
-    positional_deprecated,
-    simple_parse_args_string,
 )
 
 from lm_tournament_eval.evaluator_utils import (
     consolidate_group_results,
     consolidate_results,
-    get_sample_size,
     get_subtask_list,
-    get_task_list,
     prepare_print_tasks,
-    print_writeout,
-    run_task_tests,
 )
 
 def evaluate(
@@ -48,14 +33,8 @@ def evaluate(
     eval_tasks,
     task_dict,
     limit: Optional[int] = None,
-    cache_requests: bool = False,
-    rewrite_requests_cache: bool = False,
     bootstrap_iters: Optional[int] = 100000,
-    write_out: bool = False,
     log_samples: bool = True,
-    system_instruction: Optional[str] = None,
-    apply_chat_template: bool = False,
-    fewshot_as_multiturn: bool = False,
     verbosity: str = "INFO",
 ):
     """Instantiate and evaluate a model on a list of tasks.

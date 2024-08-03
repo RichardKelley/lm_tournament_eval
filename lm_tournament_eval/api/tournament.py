@@ -7,12 +7,13 @@ import numpy as np
 import torch
 
 from dataclasses import dataclass
-from .task import Task, TaskConfig
+from lm_tournament_eval.caching.cache import delete_cache
 
 from lm_tournament_eval.tasks import TaskManager
 from lm_tournament_eval.api.task_utils import create_requests
-from lm_tournament_eval.api.model_utils import load_models
+from lm_tournament_eval.api.model_utils import load_model
 from lm_tournament_eval.tournament_evaluator import evaluate
+from lm_tournament_eval.utils import simple_parse_args_string
 
 from typing import Optional, Union, Dict, List, Tuple
 from lm_tournament_eval.loggers import EvaluationTracker
@@ -48,27 +49,19 @@ class Tournament:
 
     def tournament_evaluate(
         self,
-        model_type: str,
         model: str,
         lm: HFLM,
         requests: Dict,
         eval_tasks: List,
         task_dict: Dict,
         model_args: Optional[Union[str, dict]] = None,
-        num_fewshot: Optional[int] = None,
         batch_size: Optional[Union[int, str]] = None,
-        max_batch_size: Optional[int] = None,
         device: Optional[str] = None,
         use_cache: Optional[str] = None,
         delete_requests_cache: bool = False,
         limit: Optional[Union[int, float]] = None,
         bootstrap_iters: int = 100000,
-        check_integrity: bool = False,
-        log_samples: bool = True,
-        evaluation_tracker: Optional[EvaluationTracker] = None,
         gen_kwargs: Optional[str] = None,
-        verbosity: str = "INFO",
-        predict_only: bool = False,
         random_seed: int = 0,
         numpy_random_seed: int = 1234,
         torch_random_seed: int = 1234,
@@ -166,12 +159,15 @@ class Tournament:
         #TODO: create function that initializes the models; ie. rip the code out of tournament_evaluate
         #      pass the one of the models into create requests
 
-        model0, model1 = load_models("hf", self.config.model0_name,
-                                     self.config.model0_args,
-                                     self.config.model1_name,
-                                     self.config.model1_args,
-                                     batch_size=self.config.batch_size,
-                                     max_batch_size=self.config.batch_size)
+        model0 = load_model("hf", self.config.model0_name,
+                                   self.config.model0_args,
+                                   batch_size=self.config.batch_size,
+                                   max_batch_size=self.config.batch_size)
+
+        model1 = load_model("hf", self.config.model1_name,
+                                   self.config.model1_args,
+                                   batch_size=self.config.batch_size,
+                                   max_batch_size=self.config.batch_size)
 
         requests0, eval_tasks0, task_dict0 = create_requests(
                 model0,
@@ -195,7 +191,6 @@ class Tournament:
             #TODO: create subset of requests of len(match_size)
             #run tournament evaluate on that subset
             results0 = self.tournament_evaluate(
-                model_type="hf",
                 model=self.config.model0_name,
                 lm=model0,
                 model_args=self.config.model0_args,
@@ -207,7 +202,6 @@ class Tournament:
                 limit=self.config.limit
             )
             results1 = self.tournament_evaluate(
-                model_type="hf",
                 model=self.config.model1_name, 
                 lm=model1,
                 model_args=self.config.model1_args,

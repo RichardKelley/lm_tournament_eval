@@ -1,14 +1,14 @@
-import lm_tournament_eval.api.task
 from lm_tournament_eval.tasks import (
     TaskManager,
     get_task_dict
 )
 
 from lm_tournament_eval.evaluator_utils import (
-    get_subtask_list,
     get_task_list,
-    get_sample_size
+    get_sample_size,
+    print_writeout
 )
+from lm_tournament_eval.api.task import Task
 
 from lm_tournament_eval.utils import eval_logger
 from collections import defaultdict
