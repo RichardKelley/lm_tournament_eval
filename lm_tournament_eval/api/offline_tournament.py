@@ -25,6 +25,7 @@ class OfflineTournamentConfig:
 class OfflineTournament:
     def __init__(self, config : OfflineTournamentConfig):
         self.config = config
+        self.elo = ELO()
         # read the offline results in 
         self.responses_0 = []
         self.responses_1 = []
@@ -40,21 +41,19 @@ class OfflineTournament:
         self.scheduler = OfflineMatchScheduler(self.scheduler_cfg)
         self.match_result_list = [MatchResult(model0_name=self.config.model0_name,
                                               model1_name=self.config.model1_name,           
-                                              model0_old_elo=self.score_0,
-                                              model1_old_elo=self.score_1,
-                                              model0_new_elo=self.score_0,
-                                              model1_new_elo=self.score_1,
-                                              task_config=self.config.task_config)
+                                              model0_old_elo=self.elo.score_0,
+                                              model1_old_elo=self.elo.score_1,
+                                              model0_new_elo=self.elo.score_0,
+                                              model1_new_elo=self.elo.score_1)
                                               for i in range(self.config.rounds)]
 
     def run_tournament(self):
-        elo = ELO()
         for n in range(self.config.rounds):
-            self.match_result_list[n].model0_old_elo = elo.score_0
-            self.match_result_list[n].model1_old_elo = elo.score_1
+            self.match_result_list[n].model0_old_elo = self.elo.score_0
+            self.match_result_list[n].model1_old_elo = self.elo.score_1
             task_indices = self.scheduler.schedule_tournament()
-            elo.offline_elo_update(self.responses_0, self.responses_1, task_names, task_indices)
-            self.match_result_list[n].model0_new_elo = elo.score_0
-            self.match_result_list[n].model1_new_elo = elo.score_1
+            self.elo.offline_elo_update(self.responses_0, self.responses_1, self.config.task_name, task_indices)
+            self.match_result_list[n].model0_new_elo = self.elo.score_0
+            self.match_result_list[n].model1_new_elo = self.elo.score_1
         return {}
 

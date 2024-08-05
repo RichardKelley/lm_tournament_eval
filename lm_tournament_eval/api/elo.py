@@ -1,5 +1,5 @@
 from .match import MatchResult, Match
-from typing import List
+from typing import List, Dict
 
 def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
@@ -11,15 +11,16 @@ class ELO:
         self.score_1 = 1200
         self.k = 16
 
-    def online_elo_update(self, results0 : dict, results1 : dict, task_names : List, match_size : int):
-        # self.match_result_list.model0_old_elo = self.score_0
-        # self.match_result_list.model1_old_elo = self.score_1
+    def online_elo_update(self, results0 : Dict, results1 : Dict, task_names : List, match_size : int, match_results : Dict):
+        index = 0
         print(f"match 0 : score_0, 1 {self.score_0}, {self.score_1}")
         print("----------------------------")
         #create list of len(num_samples) of correct/incorrect answers from results
         answers0 = {}
         answers1 = {}
         for task_name in task_names:
+            match_results[task_name][0].model0_old_elo = self.score_0
+            match_results[task_name][0].model1_old_elo = self.score_1
             answers0[task_name] = []
             answers1[task_name] = []
             for i in range(0, len(results0["samples"][task_name]), match_size):
@@ -66,10 +67,11 @@ class ELO:
                 elif sum(as_0) == sum(as_1):
                     self.score_0 = self.score_0 + self.k*(0.5 - expected_score_0)
                     self.score_1 = self.score_1 + self.k*(0.5 - expected_score_1)           
-                print(f"match {(i+1)/match_size} : score_0, 1 {self.score_0}, {self.score_1}")
+                match_results[task_name][index].model0_old_elo = self.score_0
+                match_results[task_name][index].model1_old_elo = self.score_1
+                index += 1
+                print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
                 print("----------------------------")
-                # self.match_result_list[n].model0_new_elo = self.score_0
-                # self.match_result_list[n].model1_new_elo = self.score_1
 
     def offline_elo_update(self, results0, results1, task_names, task_indices):
         # run match

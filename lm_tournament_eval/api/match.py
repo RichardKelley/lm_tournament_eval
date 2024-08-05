@@ -10,8 +10,8 @@ class MatchResult:
     """
     A record of the results of a match between two models.
     """
-    # model0_name: str
-    # model1_name: str
+    model0_name: str
+    model1_name: str
     model0_old_elo: float
     model1_old_elo: float
     model0_new_elo: float

@@ -19,6 +19,7 @@ from typing import Optional, Union, Dict, List, Tuple
 from lm_tournament_eval.loggers import EvaluationTracker
 from lm_tournament_eval.api.elo import ELO
 from lm_tournament_eval.models.huggingface_model import HFLM
+from lm_tournament_eval.api.match import MatchResult
 
 from lm_tournament_eval.loggers.utils import (
      add_env_info, 
@@ -47,6 +48,7 @@ class Tournament:
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
+        self.elo = ELO()
 
     def tournament_evaluate(
         self,
@@ -158,21 +160,19 @@ class Tournament:
         return results
 
     def run_tournament(self):
-        elo = ELO()
-        #TODO: create function that initializes the models; ie. rip the code out of tournament_evaluate
-        #      pass the one of the models into create requests
-
         model0 = load_model("hf", 
                             self.config.model0_name,
                             self.config.model0_args,
                             batch_size=self.config.batch_size,
-                            max_batch_size=self.config.batch_size)
+                            max_batch_size=self.config.batch_size,
+                            device=self.config.device)
 
         model1 = load_model("hf",
                             self.config.model1_name,
                             self.config.model1_args,
                             batch_size=self.config.batch_size,
-                            max_batch_size=self.config.batch_size)
+                            max_batch_size=self.config.batch_size,
+                            device=self.config.device)
 
         requests0, eval_tasks0, task_dict0, padding_reqests0 = create_requests(model0,
                                                                                self.tasks,
@@ -187,32 +187,38 @@ class Tournament:
                                                                                self.config.limit)
                 #TODO: add all the other params here so that build_all_requests is happy 
 
-
-        # for rounds:
-        for round in range(self.config.rounds):
-            #TODO: create subset of requests of len(match_size)
-            #run tournament evaluate on that subset
-            results0 = self.tournament_evaluate(model=self.config.model0_name,
-                                                lm=model0,
-                                                model_args=self.config.model0_args,
-                                                requests=requests0,
-                                                eval_tasks=eval_tasks0,
-                                                task_dict=task_dict0,
-                                                padding_requests=padding_reqests0,
-                                                batch_size=self.config.batch_size,
-                                                device=self.config.device,
-                                                limit=self.config.limit
-                                            )
-            results1 = self.tournament_evaluate(model=self.config.model1_name,
-                                                lm=model1,
-                                                model_args=self.config.model1_args,
-                                                requests=requests1,
-                                                eval_tasks=eval_tasks1,
-                                                task_dict=task_dict1,
-                                                padding_requests=padding_reqests1,
-                                                batch_size=self.config.batch_size,
-                                                device=self.config.device,
-                                                limit=self.config.limit
-                                            )
-            #calculate ELO updates
-            elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size)
+        results0 = self.tournament_evaluate(model=self.config.model0_name,
+                                            lm=model0,
+                                            model_args=self.config.model0_args,
+                                            requests=requests0,
+                                            eval_tasks=eval_tasks0,
+                                            task_dict=task_dict0,
+                                            padding_requests=padding_reqests0,
+                                            batch_size=self.config.batch_size,
+                                            device=self.config.device,
+                                            limit=self.config.limit
+                                        )
+        results1 = self.tournament_evaluate(model=self.config.model1_name,
+                                            lm=model1,
+                                            model_args=self.config.model1_args,
+                                            requests=requests1,
+                                            eval_tasks=eval_tasks1,
+                                            task_dict=task_dict1,
+                                            padding_requests=padding_reqests1,
+                                            batch_size=self.config.batch_size,
+                                            device=self.config.device,
+                                            limit=self.config.limit
+                                        )
+        rounds_per_task = []
+        match_results = {}
+        for i,task_name in enumerate(self.config.task_names):
+            rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
+            match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
+                                                    model1_name=self.config.model1_name,
+                                                    model0_old_elo=self.elo.score_0,
+                                                    model0_new_elo=self.elo.score_0,
+                                                    model1_old_elo=self.elo.score_1,
+                                                    model1_new_elo=self.elo.score_1)
+                                                    for i in range(rounds_per_task[i])]
+        #calculate ELO updates
+        self.elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size, match_results)
