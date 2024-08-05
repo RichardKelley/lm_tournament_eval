@@ -55,6 +55,7 @@ class Tournament:
         requests: Dict,
         eval_tasks: List,
         task_dict: Dict,
+        padding_requests: Dict,
         model_args: Optional[Union[str, dict]] = None,
         batch_size: Optional[Union[int, str]] = None,
         device: Optional[str] = None,
@@ -108,6 +109,7 @@ class Tournament:
             requests=requests,
             eval_tasks=eval_tasks,
             task_dict=task_dict,
+            padding_requests=padding_requests,
             limit=limit,
         )
 
@@ -172,17 +174,17 @@ class Tournament:
                             batch_size=self.config.batch_size,
                             max_batch_size=self.config.batch_size)
 
-        requests0, eval_tasks0, task_dict0 = create_requests(model0,
-                                                             self.tasks,
-                                                             self.task_manager,
-                                                             self.verbosity,
-                                                             self.config.limit)
+        requests0, eval_tasks0, task_dict0, padding_reqests0 = create_requests(model0,
+                                                                               self.tasks,
+                                                                               self.task_manager,
+                                                                               self.verbosity,
+                                                                               self.config.limit)
                 #TODO: add all the other params here so that build_all_requests is happy 
-        requests1, eval_tasks1, task_dict1 = create_requests(model1,
-                                                             self.tasks,
-                                                             self.task_manager,
-                                                             self.verbosity,
-                                                             self.config.limit)
+        requests1, eval_tasks1, task_dict1, padding_reqests1 = create_requests(model1,
+                                                                               self.tasks,
+                                                                               self.task_manager,
+                                                                               self.verbosity,
+                                                                               self.config.limit)
                 #TODO: add all the other params here so that build_all_requests is happy 
 
 
@@ -196,6 +198,7 @@ class Tournament:
                                                 requests=requests0,
                                                 eval_tasks=eval_tasks0,
                                                 task_dict=task_dict0,
+                                                padding_requests=padding_reqests0,
                                                 batch_size=self.config.batch_size,
                                                 device=self.config.device,
                                                 limit=self.config.limit
@@ -206,6 +209,7 @@ class Tournament:
                                                 requests=requests1,
                                                 eval_tasks=eval_tasks1,
                                                 task_dict=task_dict1,
+                                                padding_requests=padding_reqests1,
                                                 batch_size=self.config.batch_size,
                                                 device=self.config.device,
                                                 limit=self.config.limit

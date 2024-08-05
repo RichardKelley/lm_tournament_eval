@@ -32,6 +32,7 @@ def evaluate(
     requests,
     eval_tasks,
     task_dict,
+    padding_requests,
     limit: Optional[int] = None,
     bootstrap_iters: Optional[int] = 100000,
     log_samples: bool = True,
@@ -62,24 +63,6 @@ def evaluate(
     """
 
     eval_logger.setLevel(getattr(logging, f"{verbosity}"))
-
-
-
-    if lm.world_size > 1:
-        instances_rnk = torch.tensor(len(task._instances), device=lm.device)
-        gathered_item = (
-            lm.accelerator.gather(instances_rnk).cpu().detach().numpy().tolist()
-        )
-        # "multiple_choice" task types dispatch (several) "loglikelihood" request types
-        reqtype = (
-            "loglikelihood"
-            if task.OUTPUT_TYPE == "multiple_choice"
-            else task.OUTPUT_TYPE
-        )
-        # compute number of pseudo-batches to pad with (FSDP/DDP require even batches among ranks)
-        numpad = max(gathered_item) - gathered_item[lm.rank]
-        # todo: may not account for padding in cases like SquadV2 which has multiple req types
-        padding_requests[reqtype] += numpad
 
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
