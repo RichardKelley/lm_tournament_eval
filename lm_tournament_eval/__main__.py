@@ -162,7 +162,8 @@ def run_tournament():
                               task_names=task_names,
                               batch_size=args.batch_size,
                               device=args.device,
-                              limit=args.limit
+                              limit=args.limit,
+                              match_size=args.match_size
                              )
 
         #create tournament

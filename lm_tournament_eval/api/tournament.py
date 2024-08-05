@@ -38,6 +38,7 @@ class TournamentConfig:
     batch_size : int
     device : str
     limit : int
+    match_size : int 
 
 
 class Tournament:
@@ -159,60 +160,55 @@ class Tournament:
         #TODO: create function that initializes the models; ie. rip the code out of tournament_evaluate
         #      pass the one of the models into create requests
 
-        model0 = load_model("hf", self.config.model0_name,
-                                   self.config.model0_args,
-                                   batch_size=self.config.batch_size,
-                                   max_batch_size=self.config.batch_size)
+        model0 = load_model("hf", 
+                            self.config.model0_name,
+                            self.config.model0_args,
+                            batch_size=self.config.batch_size,
+                            max_batch_size=self.config.batch_size)
 
-        model1 = load_model("hf", self.config.model1_name,
-                                   self.config.model1_args,
-                                   batch_size=self.config.batch_size,
-                                   max_batch_size=self.config.batch_size)
+        model1 = load_model("hf",
+                            self.config.model1_name,
+                            self.config.model1_args,
+                            batch_size=self.config.batch_size,
+                            max_batch_size=self.config.batch_size)
 
-        requests0, eval_tasks0, task_dict0 = create_requests(
-                model0,
-                self.tasks,
-                self.task_manager,
-                self.verbosity,
-                self.config.limit)
+        requests0, eval_tasks0, task_dict0 = create_requests(model0,
+                                                             self.tasks,
+                                                             self.task_manager,
+                                                             self.verbosity,
+                                                             self.config.limit)
                 #TODO: add all the other params here so that build_all_requests is happy 
-        requests1, eval_tasks1, task_dict1 = create_requests(
-                model1,
-                self.tasks,
-                self.task_manager,
-                self.verbosity,
-                self.config.limit)
+        requests1, eval_tasks1, task_dict1 = create_requests(model1,
+                                                             self.tasks,
+                                                             self.task_manager,
+                                                             self.verbosity,
+                                                             self.config.limit)
                 #TODO: add all the other params here so that build_all_requests is happy 
 
 
         # for rounds:
         for round in range(self.config.rounds):
-
             #TODO: create subset of requests of len(match_size)
             #run tournament evaluate on that subset
-            results0 = self.tournament_evaluate(
-                model=self.config.model0_name,
-                lm=model0,
-                model_args=self.config.model0_args,
-                requests=requests0,
-                eval_tasks=eval_tasks0,
-                task_dict=task_dict0,
-                batch_size=self.config.batch_size,
-                device=self.config.device,
-                limit=self.config.limit
-            )
-            results1 = self.tournament_evaluate(
-                model=self.config.model1_name, 
-                lm=model1,
-                model_args=self.config.model1_args,
-                requests=requests1,
-                eval_tasks=eval_tasks1,
-                task_dict=task_dict1,
-                batch_size=self.config.batch_size,
-                device=self.config.device,
-                limit=self.config.limit
-            )            
+            results0 = self.tournament_evaluate(model=self.config.model0_name,
+                                                lm=model0,
+                                                model_args=self.config.model0_args,
+                                                requests=requests0,
+                                                eval_tasks=eval_tasks0,
+                                                task_dict=task_dict0,
+                                                batch_size=self.config.batch_size,
+                                                device=self.config.device,
+                                                limit=self.config.limit
+                                            )
+            results1 = self.tournament_evaluate(model=self.config.model1_name,
+                                                lm=model1,
+                                                model_args=self.config.model1_args,
+                                                requests=requests1,
+                                                eval_tasks=eval_tasks1,
+                                                task_dict=task_dict1,
+                                                batch_size=self.config.batch_size,
+                                                device=self.config.device,
+                                                limit=self.config.limit
+                                            )
             #calculate ELO updates
-            elo.online_elo_update(results0, results1, self.config.task_names)
-
-
+            elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size)
