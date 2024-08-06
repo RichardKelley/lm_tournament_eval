@@ -443,7 +443,7 @@ class HFLM(LM):
                 logits = logits.unsqueeze(0) 
 
                 greedy_tokens = logits.argmax(dim=-1)
-
+                
                 cont_toks = torch.tensor(cont_toks, dtype=torch.long, device=self.device).unsqueeze(0)
                 max_equal = (greedy_tokens == cont_toks).all()
                 
@@ -453,6 +453,7 @@ class HFLM(LM):
                 res.append(answer)
                 pbar.update(1)
 
+        pbar.close()
         return res
             
     def loglikelihood_rolling(self, requests : List[str], disable_tqdm : bool = False) -> List[Tuple[float]]:

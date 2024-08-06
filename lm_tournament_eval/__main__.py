@@ -10,9 +10,6 @@ from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
 from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
 from lm_tournament_eval.api.task import TaskConfig
 from lm_tournament_eval.tasks import TaskManager
-
-from lm_tournament_eval.tournament_evaluator import tournament_evaluate
-
 from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
 
 def setup_parser() -> argparse.ArgumentParser:
@@ -156,33 +153,27 @@ def run_tournament():
         result = tournament.run_tournament()    
     else:
         # validate tournament parameters.
-        #cfg = TournamentConfig(name=args.tournament_name,
-        #                       rounds=args.num_rounds,
-        #                       model0_name = args.model0,
-        #                       model1_name = args.model1,
-        #                       task_name=args.tasks
-        #                      )
+        cfg = TournamentConfig(name=args.tournament_name,
+                              rounds=args.num_rounds,
+                              model0_name=args.model0,
+                              model0_args=args.model0_args,
+                              model1_name=args.model1,
+                              model1_args=args.model1_args,
+                              task_names=task_names,
+                              batch_size=args.batch_size,
+                              device=args.device,
+                              limit=args.limit,
+                              match_size=args.match_size
+                             )
 
-        # create tournament
-        #tournament = Tournament(cfg)
+        #create tournament
+        tournament = Tournament(cfg, task_names, task_manager, args.verbosity)
 
         #logging.info(f"Running tournament {cfg}")
+        tournament.run_tournament()
 
-        results0, results1 = tournament_evaluate(
-            model_type="hf",
-            model0=args.model0,
-            model1=args.model1,
-            model0_args=args.model0_args,
-            model1_args=args.model1_args,
-            tasks=task_names,
-            task_manager=task_manager,
-            limit=args.limit,
-            batch_size=args.batch_size,
-            device=args.device
-        )
-
-        newline = '\n'
-        print(f"{results0}{newline*10}{results1}")
+        #newline = '\n'
+        # print(f"{results0}{newline*10}{results1}")
 
     # save tournament results to disk.
 
