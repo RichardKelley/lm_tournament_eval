@@ -1,3 +1,4 @@
+import torch
 from lm_tournament_eval.tasks import (
     TaskManager,
     get_task_dict
