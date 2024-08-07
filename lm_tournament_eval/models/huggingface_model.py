@@ -497,7 +497,7 @@ class HFLM(LM):
 
         pbar = tqdm(
             total=len(requests),
-            disable=disable_tqdm,
+            disable=disable_tqdm or (self._rank != 0),
             desc="Running loglikelihood requests",
         )
 
@@ -572,7 +572,7 @@ class HFLM(LM):
         '''
         loglikelihoods = []
 
-        for req in tqdm(requests, disable=disable_tqdm):
+        for req in tqdm(requests, disable=disable_tqdm or (self._rank != 0)):
             string = req
             rolling_token_windows = list(
                 map(
@@ -669,7 +669,7 @@ class HFLM(LM):
 
         pbar = tqdm(
             total=len(requests),
-            disable=disable_tqdm,
+            disable=disable_tqdm or (self._rank != 0),
             desc="Running generate_until requests",
         )
 
