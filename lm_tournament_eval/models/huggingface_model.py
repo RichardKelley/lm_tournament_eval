@@ -149,7 +149,7 @@ class HFLM(LM):
 
         # create model
         if isinstance(model, str):
-            self._create_model(model, dtype=dtype, device=device, **kwargs)
+            self._create_model(model, dtype=dtype, device=device, parallelize=parallelize, **kwargs)
 
         self.tokenizer = configure_pad_token(self.tokenizer)
         if isinstance(model, str):
@@ -355,7 +355,7 @@ class HFLM(LM):
 
         if parallelize:
             model_kwargs.update(
-                _get_accelerate_args(
+                self._get_accelerate_args(
                     device_map_option,
                     max_memory_per_gpu,
                     max_cpu_memory,
@@ -379,7 +379,6 @@ class HFLM(LM):
                     model_kwargs["bnb_4bit_compute_dtype"] = get_dtype(
                         model_kwargs["bnb_4bit_compute_dtype"]
                     )
-
         self._model = self.AUTO_MODEL_CLASS.from_pretrained(
             model,
             torch_dtype=get_dtype(dtype),
