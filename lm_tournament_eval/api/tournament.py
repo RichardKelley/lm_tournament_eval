@@ -211,14 +211,16 @@ class Tournament:
                                         )
         rounds_per_task = []
         match_results = {}
-        for i,task_name in enumerate(self.config.task_names):
-            rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
-            match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
-                                                    model1_name=self.config.model1_name,
-                                                    model0_old_elo=self.elo.score_0,
-                                                    model0_new_elo=self.elo.score_0,
-                                                    model1_old_elo=self.elo.score_1,
-                                                    model1_new_elo=self.elo.score_1)
-                                                    for i in range(rounds_per_task[i])]
-        #calculate ELO updates
-        self.elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size, match_results)
+        if model0._rank == 0:
+            for i,task_name in enumerate(self.config.task_names):
+                print(len(results0["samples"][task_name]))
+                rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
+                match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
+                                                        model1_name=self.config.model1_name,
+                                                        model0_old_elo=self.elo.score_0,
+                                                        model0_new_elo=self.elo.score_0,
+                                                        model1_old_elo=self.elo.score_1,
+                                                        model1_new_elo=self.elo.score_1)
+                                                        for i in range(rounds_per_task[i])]
+            #calculate ELO updates
+            self.elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size, match_results)

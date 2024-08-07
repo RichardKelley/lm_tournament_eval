@@ -27,7 +27,10 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                 },
             )
         else:
-            model_args += f"model={model}"
+            if model_args == "":
+                model_args += f"model={model}"
+            else:
+                model_args += f",model={model}"
             logging.info(
                 f"Initializing {model} model, with arguments: {simple_parse_args_string(model_args)}"
             )
