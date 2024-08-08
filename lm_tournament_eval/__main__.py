@@ -4,6 +4,7 @@ import sys
 import logging
 import datetime
 import os
+import csv
 
 from lm_tournament_eval import utils
 from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
@@ -47,6 +48,13 @@ def setup_parser() -> argparse.ArgumentParser:
                         help="File path for first model results.")
     parser.add_argument("--offline_file_1", type=str, default="",
                         help="File path for second model results.")
+    
+    parser.add_argument("--elo_csv_in", type=str, default=None,
+                        help="Path to CSV file with initial ELO scores.")
+    #parser.add_argument("--save_scores", type=bool, default=False,
+    #                    help="Write scores back out to input file.")
+    parser.add_argument("--elo_csv_out", type=str, default=None,
+                        help="Path to CSV file to write updated ELO scores.")
 
     return parser
 
@@ -133,6 +141,16 @@ def run_tournament():
     # set up local logger.
     # set up wandb logger.
 
+    initial_elos = {}
+    if args.elo_csv_in is not None:
+        with open(args.elo_csv_in, 'r') as f:
+            reader = csv.reader(f, delimiter=',')
+            for row in reader:
+                model, bpw, elo = row
+                initial_elos.update({(model, bpw): float(elo)})
+
+    logging.info(f"Using initial elo scores {initial_elos}")
+
     if args.offline == True:
         # validate tournament parameters.
         task_config = TaskConfig()
@@ -167,7 +185,13 @@ def run_tournament():
                              )
 
         #create tournament
-        tournament = Tournament(cfg, task_names, task_manager, args.verbosity)
+        tournament = Tournament(
+            cfg, 
+            task_names, 
+            task_manager, 
+            args.verbosity, 
+            initial_elos,
+            args.elo_csv_out)
 
         #logging.info(f"Running tournament {cfg}")
         tournament.run_tournament()

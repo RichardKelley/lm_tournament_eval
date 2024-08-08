@@ -39,16 +39,37 @@ class TournamentConfig:
     batch_size : int
     device : str
     limit : int
-    match_size : int 
-
+    match_size : int
 
 class Tournament:
-    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity):
+    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None):
         self.config = config
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
-        self.elo = ELO()
+        self.elo_out = elo_out
+
+        # get model0_key
+        model0_bpw = '16'
+        if config.model0_args is not None:
+            print(config.model0_args)
+            if "load_in_4bit" in config.model0_args:
+                model0_bpw = '4'
+            elif "load_in_8bit" in config.model0_args:
+                model0_bpw = '8'
+               
+        model1_bpw = '16'
+        if config.model1_args is not None:
+            print(config.model1_args)
+            if "load_in_4bit" in config.model1_args:
+                model1_bpw = '4'
+            if "load_in_8bit" in config.model1_args:
+                model1_bpw = '8'
+
+        model0_key = (config.model0_name, model0_bpw)
+        model1_key = (config.model1_name, model1_bpw)
+
+        self.elo = ELO(model0_key, model1_key, initial_elos, elo_out)
 
     def tournament_evaluate(
         self,
