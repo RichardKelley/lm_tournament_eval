@@ -675,7 +675,7 @@ class HFLM(LM):
 
         batch_size = self.batch_size
 
-        chunks = get_batches(requests, n=batch_size)
+        chunks = get_batches([req.args for req in requests], n=batch_size)
         for chunk in chunks:
             contexts, all_gen_kwargs = zip(*chunk)
             gen_kwargs = all_gen_kwargs[0]

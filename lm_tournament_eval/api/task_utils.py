@@ -26,7 +26,8 @@ def create_requests(lm, tasks, task_manager, verbosity, limit,
                     fewshot_as_multiturn: bool = False,
                     system_instruction: Optional[str] = None,
                     write_out: bool = False,
-                    log_samples: bool = True    
+                    log_samples: bool = True,
+                    gen_kwargs: str = None
     ):
     if task_manager is None:
         task_manager = TaskManager(verbosity)

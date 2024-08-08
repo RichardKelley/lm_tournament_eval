@@ -23,6 +23,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--batch_size", "-b", default=1, type=int)
+    parser.add_argument("--gen_kwargs", type=str, default=None, help=("String arguments for model generation on greedy_until tasks, e.g. `temperature=0,top_k=0,top_p=0`."))
     parser.add_argument("--match_size", default=1, type=int)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output_path", "-o", type=str, default=".")
@@ -179,6 +180,7 @@ def run_tournament():
                               model1_args=args.model1_args,
                               task_names=task_names,
                               batch_size=args.batch_size,
+                              gen_kwargs=args.gen_kwargs,
                               device=args.device,
                               limit=args.limit,
                               match_size=args.match_size

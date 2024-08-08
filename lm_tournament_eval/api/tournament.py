@@ -37,6 +37,7 @@ class TournamentConfig:
     task_names : str
     rounds : int
     batch_size : int
+    gen_kwargs : str
     device : str
     limit : int
     match_size : int
@@ -199,13 +200,15 @@ class Tournament:
                                                                                self.tasks,
                                                                                self.task_manager,
                                                                                self.verbosity,
-                                                                               self.config.limit)
+                                                                               self.config.limit,
+                                                                               gen_kwargs=self.config.gen_kwargs)
                 #TODO: add all the other params here so that build_all_requests is happy 
         requests1, eval_tasks1, task_dict1, padding_reqests1 = create_requests(model1,
                                                                                self.tasks,
                                                                                self.task_manager,
                                                                                self.verbosity,
-                                                                               self.config.limit)
+                                                                               self.config.limit,
+                                                                               gen_kwargs=self.config.gen_kwargs)
                 #TODO: add all the other params here so that build_all_requests is happy 
 
         results0 = self.tournament_evaluate(model=self.config.model0_name,

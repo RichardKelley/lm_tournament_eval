@@ -45,23 +45,36 @@ class ELO:
         for task_name in task_names:
             match_results[task_name][0].model0_old_elo = self.score_0
             match_results[task_name][0].model1_old_elo = self.score_1
-            answers0[task_name] = []
-            answers1[task_name] = []
             for i in range(0, len(results0["samples"][task_name]), match_size):
-                for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
-                    nll0 = [response[0][0] for response in result0["resps"]]
-                    nll1 = [response[0][0] for response in result1["resps"]]
-                    prediction0 = argmax(nll0)
-                    prediction1 = argmax(nll1)
-                    if prediction0 == result0["target"]:
-                        answers0[task_name].append(1)
-                    else:
-                        answers0[task_name].append(0)
-                    if prediction1 == result1["target"]:
-                        answers1[task_name].append(1)
-                    else:
-                        answers1[task_name].append(0)
-
+                breakpoint()
+                answers0[task_name] = []
+                answers1[task_name] = []
+                if results0['configs'][task_name]['output_type'] == 'generate_until':
+                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+                        if result0['exact_match'] == 1.0:
+                            answers0[task_name].append(1)
+                        else:
+                            answers0[task_name].append(0)
+                        if result1['exact_match'] == 1.0:
+                            answers1[task_name].append(1)
+                        else:
+                            answers1[task_name].append(0)
+                else:    
+                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+                        nll0 = [response[0][0] for response in result0["resps"]]
+                        nll1 = [response[0][0] for response in result1["resps"]]
+                        prediction0 = argmax(nll0)
+                        prediction1 = argmax(nll1)
+                        if prediction0 == result0["target"]:
+                            answers0[task_name].append(1)
+                        else:
+                            answers0[task_name].append(0)
+                        if prediction1 == result1["target"]:
+                            answers1[task_name].append(1)
+                        else:
+                            answers1[task_name].append(0)
+                print(f"answers0: {answers0}")
+                print(f"answers1: {answers1}")
                 # calculate the wins, losses, and draws
                 as_0 = []
                 as_1 = []
