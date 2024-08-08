@@ -39,16 +39,16 @@ class TournamentConfig:
     batch_size : int
     device : str
     limit : int
-    match_size : int 
-
+    match_size : int
 
 class Tournament:
-    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity):
+    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, save_scores=False):
         self.config = config
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
-        self.elo = ELO()
+        self.elo = ELO(config.model0_name, config.model1_name, initial_elos, save_scores)
+
 
     def tournament_evaluate(
         self,

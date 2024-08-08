@@ -1,14 +1,37 @@
 from .match import MatchResult, Match
 from typing import List, Dict
+import logging
+import csv
 
 def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
 
 class ELO:
-    def __init__(self):
-        # set the initial scores
-        self.score_0 = 1200
-        self.score_1 = 1200
+    def __init__(self, model0_name, model1_name, initial_elos=None, save_scores=False):
+
+        if initial_elos is not None:
+            self.initial_elos = initial_elos
+            self.model0_name = model0_name
+            self.model1_name = model1_name
+            self.save_scores = save_scores
+
+            # set the initial scores
+            if model0_name in initial_elos.keys():
+                self.score_0 = initial_elos[model0_name]
+            else:
+                self.score_0 = 1200
+
+            if model1_name in initial_elos.keys():
+                self.score_1 = initial_elos[model1_name]
+            else:
+                self.score_1 = 1200
+        else:
+            self.initial_elos = {
+                model0_name : 1200,
+                model1_name : 1200
+            }
+            self.score_0 = 1200
+            self.score_1 = 1200
         self.k = 16
 
     def online_elo_update(self, results0 : Dict, results1 : Dict, task_names : List, match_size : int, match_results : Dict):
@@ -72,6 +95,21 @@ class ELO:
                 index += 1
                 print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
                 print("----------------------------")
+        
+        if self.save_scores:
+            print(f"save_scores = {self.save_scores}")
+
+            if self.model0_name in self.initial_elos.keys():
+                logging.info(f"Writing new ELO score for {self.model0_name}.")
+                self.initial_elos[self.model0_name] = self.score_0
+            if self.model1_name in self.initial_elos.keys():
+                logging.info(f"Writing new ELO score for {self.model1_name}.")
+                self.initial_elos[self.model1_name] = self.score_1
+
+            with open('elos.csv', 'w') as f:
+                writer = csv.writer(f, delimiter=' ')
+                for k, v in self.initial_elos.items():
+                    writer.writerow([k, v])
 
     def offline_elo_update(self, results0, results1, task_names, task_indices):
         # run match
