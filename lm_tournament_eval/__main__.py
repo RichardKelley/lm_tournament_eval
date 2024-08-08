@@ -144,8 +144,8 @@ def run_tournament():
         with open(args.elo_csv_in, 'r') as f:
             reader = csv.reader(f, delimiter=' ')
             for row in reader:
-                model, elo = row
-                initial_elos.update({model: float(elo)})
+                model, bpw, elo = row
+                initial_elos.update({(model, bpw): float(elo)})
 
     logging.info(f"Using initial elo scores {initial_elos}")
 
