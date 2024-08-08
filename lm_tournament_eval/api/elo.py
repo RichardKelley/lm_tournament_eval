@@ -7,7 +7,7 @@ def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
 
 class ELO:
-    def __init__(self, model0_key, model1_key, initial_elos=None, save_scores=False):
+    def __init__(self, model0_key, model1_key, initial_elos=None, elo_out=None):
 
         if initial_elos is not None:
             self.initial_elos = initial_elos
@@ -15,7 +15,7 @@ class ELO:
             self.model0_bpw = model0_key[1]
             self.model1_name = model1_key[0]
             self.model1_bpw = model1_key[1]
-            self.save_scores = save_scores
+            self.elo_out = elo_out
             # set the initial scores
             if model0_key in initial_elos.keys():
                 self.score_0 = initial_elos[model0_key]
@@ -97,15 +97,16 @@ class ELO:
                 print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
                 print("----------------------------")
         
-        if self.save_scores:
-            print(f"save_scores = {self.save_scores}")
+        if self.elo_out is not None:
+            print(f"elo_out file = {self.elo_out}")
+
             logging.info(f"Writing new ELO score for {self.model0_name}.")
             self.initial_elos[(self.model0_name, self.model0_bpw)] = self.score_0
             logging.info(f"Writing new ELO score for {self.model1_name}.")
             self.initial_elos[(self.model1_name, self.model1_bpw)] = self.score_1
 
-            with open('elos.csv', 'w') as f:
-                writer = csv.writer(f, delimiter=' ')
+            with open(self.elo_out, 'w') as f:
+                writer = csv.writer(f, delimiter=',')
                 for (k, bpw), v in self.initial_elos.items():
                     writer.writerow([k, bpw, v])
 

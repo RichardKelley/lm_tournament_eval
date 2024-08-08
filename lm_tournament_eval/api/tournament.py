@@ -42,11 +42,12 @@ class TournamentConfig:
     match_size : int
 
 class Tournament:
-    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, save_scores=False):
+    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None):
         self.config = config
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
+        self.elo_out = elo_out
 
         # get model0_key
         model0_bpw = '16'
@@ -72,7 +73,7 @@ class Tournament:
         model0_key = (config.model0_name, model0_bpw)
         model1_key = (config.model1_name, model1_bpw)
 
-        self.elo = ELO(model0_key, model1_key, initial_elos, save_scores)
+        self.elo = ELO(model0_key, model1_key, initial_elos, elo_out)
 
     def tournament_evaluate(
         self,

@@ -51,8 +51,10 @@ def setup_parser() -> argparse.ArgumentParser:
     
     parser.add_argument("--elo_csv_in", type=str, default=None,
                         help="Path to CSV file with initial ELO scores.")
-    parser.add_argument("--save_scores", type=bool, default=False,
-                        help="Write scores back out to input file.")
+    #parser.add_argument("--save_scores", type=bool, default=False,
+    #                    help="Write scores back out to input file.")
+    parser.add_argument("--elo_csv_out", type=str, default=None,
+                        help="Path to CSV file to write updated ELO scores.")
 
     return parser
 
@@ -142,7 +144,7 @@ def run_tournament():
     initial_elos = {}
     if args.elo_csv_in is not None:
         with open(args.elo_csv_in, 'r') as f:
-            reader = csv.reader(f, delimiter=' ')
+            reader = csv.reader(f, delimiter=',')
             for row in reader:
                 model, bpw, elo = row
                 initial_elos.update({(model, bpw): float(elo)})
@@ -189,7 +191,7 @@ def run_tournament():
             task_manager, 
             args.verbosity, 
             initial_elos,
-            args.save_scores)
+            args.elo_csv_out)
 
         #logging.info(f"Running tournament {cfg}")
         tournament.run_tournament()
