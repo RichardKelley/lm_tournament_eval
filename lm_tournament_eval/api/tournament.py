@@ -57,9 +57,7 @@ class Tournament:
                 model0_bpw = '4'
             elif "load_in_8bit" in config.model0_args:
                 model0_bpw = '8'
-        
-        print(f"model0_bpw = {model0_bpw}")
-        
+               
         model1_bpw = '16'
         if config.model1_args is not None:
             print(config.model1_args)
@@ -67,8 +65,6 @@ class Tournament:
                 model1_bpw = '4'
             if "load_in_8bit" in config.model1_args:
                 model1_bpw = '8'
-
-        print(f"model1_bpw = {model1_bpw}")
 
         model0_key = (config.model0_name, model0_bpw)
         model1_key = (config.model1_name, model1_bpw)
