@@ -16,7 +16,6 @@ class ELO:
             self.model1_name = model1_key[0]
             self.model1_bpw = model1_key[1]
             self.save_scores = save_scores
-
             # set the initial scores
             if model0_key in initial_elos.keys():
                 self.score_0 = initial_elos[model0_key]
@@ -100,17 +99,14 @@ class ELO:
         
         if self.save_scores:
             print(f"save_scores = {self.save_scores}")
-
-            if self.model0_name in self.initial_elos.keys():
-                logging.info(f"Writing new ELO score for {self.model0_name}.")
-                self.initial_elos[(self.model0_name, self.model0_bpw)] = self.score_0
-            if self.model1_name in self.initial_elos.keys():
-                logging.info(f"Writing new ELO score for {self.model1_name}.")
-                self.initial_elos[(self.model1_name, self.model1_bpw)] = self.score_1
+            logging.info(f"Writing new ELO score for {self.model0_name}.")
+            self.initial_elos[(self.model0_name, self.model0_bpw)] = self.score_0
+            logging.info(f"Writing new ELO score for {self.model1_name}.")
+            self.initial_elos[(self.model1_name, self.model1_bpw)] = self.score_1
 
             with open('elos.csv', 'w') as f:
                 writer = csv.writer(f, delimiter=' ')
-                for k, bpw, v in self.initial_elos.items():
+                for (k, bpw), v in self.initial_elos.items():
                     writer.writerow([k, bpw, v])
 
     def offline_elo_update(self, results0, results1, task_names, task_indices):

@@ -49,23 +49,23 @@ class Tournament:
         self.verbosity = verbosity
 
         # get model0_key
-        model0_bpw = 16
+        model0_bpw = '16'
         if config.model0_args is not None:
             print(config.model0_args)
             if "load_in_4bit" in config.model0_args:
-                model0_bpw = 4
+                model0_bpw = '4'
             elif "load_in_8bit" in config.model0_args:
-                model0_bpw = 8
+                model0_bpw = '8'
         
         print(f"model0_bpw = {model0_bpw}")
         
-        model1_bpw = 16
+        model1_bpw = '16'
         if config.model1_args is not None:
             print(config.model1_args)
             if "load_in_4bit" in config.model1_args:
-                model1_bpw = 4
+                model1_bpw = '4'
             if "load_in_8bit" in config.model1_args:
-                model1_bpw = 8
+                model1_bpw = '8'
 
         print(f"model1_bpw = {model1_bpw}")
 
