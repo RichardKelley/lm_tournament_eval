@@ -46,7 +46,6 @@ class ELO:
             match_results[task_name][0].model0_old_elo = self.score_0
             match_results[task_name][0].model1_old_elo = self.score_1
             for i in range(0, len(results0["samples"][task_name]), match_size):
-                breakpoint()
                 answers0[task_name] = []
                 answers1[task_name] = []
                 if results0['configs'][task_name]['output_type'] == 'generate_until':
@@ -73,8 +72,6 @@ class ELO:
                             answers1[task_name].append(1)
                         else:
                             answers1[task_name].append(0)
-                print(f"answers0: {answers0}")
-                print(f"answers1: {answers1}")
                 # calculate the wins, losses, and draws
                 as_0 = []
                 as_1 = []
