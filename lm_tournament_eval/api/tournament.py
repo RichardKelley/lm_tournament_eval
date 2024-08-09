@@ -37,9 +37,11 @@ class TournamentConfig:
     task_names : str
     rounds : int
     batch_size : int
+    gen_kwargs : str
     device : str
     limit : int
     match_size : int
+    cmd_filter : str
 
 class Tournament:
     def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None):
@@ -199,13 +201,17 @@ class Tournament:
                                                                                self.tasks,
                                                                                self.task_manager,
                                                                                self.verbosity,
-                                                                               self.config.limit)
+                                                                               self.config.limit,
+                                                                               cmd_filter=self.config.cmd_filter,
+                                                                               gen_kwargs=self.config.gen_kwargs)
                 #TODO: add all the other params here so that build_all_requests is happy 
         requests1, eval_tasks1, task_dict1, padding_reqests1 = create_requests(model1,
                                                                                self.tasks,
                                                                                self.task_manager,
                                                                                self.verbosity,
-                                                                               self.config.limit)
+                                                                               self.config.limit,
+                                                                               cmd_filter=self.config.cmd_filter,
+                                                                               gen_kwargs=self.config.gen_kwargs)
                 #TODO: add all the other params here so that build_all_requests is happy 
 
         results0 = self.tournament_evaluate(model=self.config.model0_name,
@@ -234,7 +240,6 @@ class Tournament:
         match_results = {}
         if model0._rank == 0:
             for i,task_name in enumerate(self.config.task_names):
-                print(len(results0["samples"][task_name]))
                 rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
                 match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
                                                         model1_name=self.config.model1_name,

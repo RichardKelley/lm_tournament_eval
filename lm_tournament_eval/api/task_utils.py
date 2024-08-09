@@ -26,7 +26,9 @@ def create_requests(lm, tasks, task_manager, verbosity, limit,
                     fewshot_as_multiturn: bool = False,
                     system_instruction: Optional[str] = None,
                     write_out: bool = False,
-                    log_samples: bool = True    
+                    log_samples: bool = True,
+                    cmd_filter: str  = 'none',
+                    gen_kwargs: str = None
     ):
     if task_manager is None:
         task_manager = TaskManager(verbosity)
@@ -39,6 +41,19 @@ def create_requests(lm, tasks, task_manager, verbosity, limit,
         )
 
     task_dict = get_task_dict(tasks, task_manager)
+
+    filter_found = False
+    filter_names = []
+    for task_name in task_dict.keys():
+        for filter in task_dict[task_name]._filters:
+            if filter.name == cmd_filter:
+                filter_found = True
+                task_dict[task_name]._filters = [filter]
+            filter_names.append(filter.name)
+    if filter_found is False:
+        raise ValueError(
+            f"User specified filter not found in the task yaml. Available filters are: {filter_names}"
+        )
     # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
     # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)
     def _adjust_config(task_dict):
