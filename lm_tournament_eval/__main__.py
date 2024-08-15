@@ -69,7 +69,7 @@ def run_tournament():
                                       offline_file_1=args.offline_file_1,
                                       task_name=args.tasks,
                                       rounds=args.num_rounds,
-                                      num_samples=args.match_size,
+                                      match_size=args.match_size,
                                       task_config=task_config,
                                       model0_name = args.model0,
                                       model1_name = args.model1

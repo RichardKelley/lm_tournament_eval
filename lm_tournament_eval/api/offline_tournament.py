@@ -16,7 +16,7 @@ class OfflineTournamentConfig:
     offline_file_1 : str
     task_name : str
     rounds : int
-    num_samples : int
+    match_size : int
     task_config : TaskConfig
     model0_name : str
     model1_name : str
@@ -37,7 +37,7 @@ class OfflineTournament:
                 self.responses_1.append(json.loads(line))
 
         self.scheduler_cfg = OfflineMatchSchedulerConfig(rounds = config.rounds,
-                                                         num_samples = config.num_samples)
+                                                         match_size = config.match_size)
         self.scheduler = OfflineMatchScheduler(self.scheduler_cfg)
         self.match_result_list = [MatchResult(model0_name=self.config.model0_name,
                                               model1_name=self.config.model1_name,           
