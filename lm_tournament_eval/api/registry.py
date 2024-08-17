@@ -3,7 +3,7 @@ from typing import Callable, Dict
 
 import evaluate as hf_evaluate
 
-from lm_tournament_eval.api.model import LM
+from lm_tournament_eval.api.model import TournamentLM
 
 eval_logger = logging.getLogger("lm-eval")
 
@@ -17,7 +17,7 @@ def register_model(*names):
     def decorate(cls):
         for name in names:
             assert issubclass(
-                cls, LM
+                cls, TournamentLM
             ), f"Model '{name}' ({cls.__name__}) must extend LM class"
 
             assert (
