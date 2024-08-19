@@ -18,6 +18,7 @@ from lm_tournament_eval.utils import simple_parse_args_string
 from typing import Optional, Union, Dict, List, Tuple
 from lm_tournament_eval.loggers import EvaluationTracker
 from lm_tournament_eval.api.elo import ELO
+from lm_tournament_eval.api.bt import BradleyTerryModel
 from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
 
@@ -42,6 +43,7 @@ class TournamentConfig:
     limit : int
     match_size : int
     cmd_filter : str
+    ranking_system : str
 
 class Tournament:
     def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None):
@@ -71,7 +73,10 @@ class Tournament:
         model0_key = (config.model0_name, model0_bpw)
         model1_key = (config.model1_name, model1_bpw)
 
-        self.elo = ELO(model0_key, model1_key, initial_elos, elo_out)
+        if self.config.ranking_system == "elo":
+            self.elo = ELO(model0_key, model1_key, initial_elos, elo_out)
+        if self.config.ranking_system == "bt":
+            self.bt = BradleyTerryModel()
 
     def tournament_evaluate(
         self,
@@ -241,6 +246,8 @@ class Tournament:
         if model0._rank == 0:
             for i,task_name in enumerate(self.config.task_names):
                 rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
+            #calculate ELO updates
+            if self.config.ranking_system == "elo":
                 match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
                                                         model1_name=self.config.model1_name,
                                                         model0_old_elo=self.elo.score_0,
@@ -248,5 +255,6 @@ class Tournament:
                                                         model1_old_elo=self.elo.score_1,
                                                         model1_new_elo=self.elo.score_1)
                                                         for i in range(rounds_per_task[i])]
-            #calculate ELO updates
-            self.elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size, match_results)
+                self.elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size, match_results)
+            if self.config.ranking_system == "bt":
+                self.bt.create_results(results0, results1, self.config.task_names, self.config.match_size)

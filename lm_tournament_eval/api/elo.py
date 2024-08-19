@@ -81,11 +81,14 @@ class ELO:
                     if answers0[task_name][i] == answers1[task_name][i]:
                         as_0.append(0)
                         as_1.append(0)
+                        print("draw")
                     # model 1 won 
                     elif answers0[task_name][i] > answers1[task_name][i]:
+                        print("model 0 won")
                         as_0.append(1)
                     # model 2 won
                     elif answers0[task_name][i] < answers1[task_name][i]:
+                        print("model 1 won")
                         as_1.append(1)
 
                 expected_score_0 = 1/(1+10**((self.score_0-self.score_1)/400))

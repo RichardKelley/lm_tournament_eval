@@ -28,6 +28,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--match_size", default=1, type=int)
     parser.add_argument("--device", type=str, default="cuda:0")
     parser.add_argument("--output_path", "-o", type=str, default=".")
+    parser.add_argument("--ranking_system", type=str, default="elo")
     parser.add_argument("--tournament_name", type=str, default="")
     parser.add_argument("--log_samples", "-s", type=bool, default=True)
     parser.add_argument("--system_instruction", type=str, default="")
@@ -185,7 +186,8 @@ def run_tournament():
                               device=args.device,
                               limit=args.limit,
                               match_size=args.match_size,
-                              cmd_filter=args.filter
+                              cmd_filter=args.filter,
+                              ranking_system=args.ranking_system
                              )
 
         #create tournament
