@@ -12,7 +12,7 @@ import lm_tournament_eval.api.task
 from lm_tournament_eval.api.task import Task
 
 import lm_tournament_eval.models
-from lm_tournament_eval.api.model import LM
+from lm_tournament_eval.models.huggingface_model import TournamentHFLM
 
 from lm_tournament_eval.utils import (
     eval_logger,
@@ -28,7 +28,7 @@ from lm_tournament_eval.evaluator_utils import (
 )
 
 def evaluate(
-    lm: "LM",
+    lm: TournamentHFLM,
     requests,
     eval_tasks,
     task_dict,
