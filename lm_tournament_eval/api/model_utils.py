@@ -3,6 +3,52 @@ import lm_tournament_eval.models
 from lm_tournament_eval.api.registry import get_model
 from lm_tournament_eval.utils import simple_parse_args_string
 
+from typing import Tuple
+
+# as of 22 August 2024
+_ANTHROPIC_MODELS = [
+    "claude-3-5-sonnet-20240620",
+    "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    "claude-3-5-sonnet@20240620",
+    "claude-3-opus-20240229",
+    "claude-3-sonnet-20240229",
+    "claude-3-haiku-20240307",
+    "anthropic.claude-3-opus-20240229-v1:0",
+    "anthropic.claude-3-sonnet-20240229-v1:0",
+    "anthropic.claude-3-haiku-20240307-v1:0",
+    "claude-3-opus@20240229",
+    "claude-3-sonnet@20240229",
+    "claude-3-haiku@20240307",
+
+    # legacy models
+    "claude-2.1",
+    "claude-2.0",
+    "claude-instant-1.2",
+]
+
+def parse_model_name(model_name) -> Tuple[str, str]:
+    """
+    Given a model name that may be either a Hugging Face model path or a specification of the
+    form <api-name>:<model-name>, return a pair consisting of the 'model_type' and the 'model'
+    that are expected by the load_model function.
+    """
+    if ':' in model_name:
+        idx = model_name.find(":")
+        model_type = model_name[:idx]
+        model = model_name[(idx+1):]
+
+        model_type = model_type.lower()
+        assert(model_type in ['anthropic-completions'])
+
+        match model_type:
+            case "anthropic-completions":
+                assert(model in _ANTHROPIC_MODELS)
+                return (model_type, model)
+
+    else:
+        # assume we're in the hf case.
+        return ("hf", model_name)
+
 def load_model(model_type, model, model_args, batch_size: int = 1,
                max_batch_size: int = 1, device: str = "cuda:0"):
 
@@ -18,14 +64,23 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                 f"Initializing {model} model, with arguments: {model_args}."
             )
 
-            lm = get_model(model_type).create_from_arg_obj(
-                model_args,
-                {
-                    "batch_size" : batch_size,
-                    "max_batch_size" : max_batch_size,
-                    "device":  device,
-                },
-            )
+            match model_type:
+                case "hf":
+                    lm = get_model(model_type).create_from_arg_obj(
+                        model_args,
+                        {
+                            "batch_size" : batch_size,
+                            "max_batch_size" : max_batch_size,
+                            "device":  device,
+                        },
+                    )
+                case "anthropic-completions":
+                    lm = get_model(model_type).create_from_arg_obj(
+                        model_args,
+                        { }
+                    )
+
+            
         else:
             if model_args == "":
                 model_args += f"model={model}"
@@ -34,14 +89,23 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
             logging.info(
                 f"Initializing {model} model, with arguments: {simple_parse_args_string(model_args)}"
             )
-            lm = get_model(model_type).create_from_arg_string(
-                model_args,
-                {
-                    "batch_size": batch_size,
-                    "max_batch_size": max_batch_size,
-                    "device": device,
-                }
-            )
+
+            match model_type:
+                case "hf":
+                    lm = get_model(model_type).create_from_arg_string(
+                        model_args,
+                        {
+                            "batch_size": batch_size,
+                            "max_batch_size": max_batch_size,
+                            "device": device,
+                        }
+                    )
+                case "anthropic-completions":
+                    lm = get_model(model_type).create_from_arg_string(
+                        model_args,
+                        { }
+                    )
+
     else:
         if not isinstance(model, lm_tournament_eval.api.model.LM):
             raise TypeError
