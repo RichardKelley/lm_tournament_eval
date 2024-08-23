@@ -6,6 +6,8 @@ import random
 import numpy as np
 import torch
 
+from hflm import LM
+
 from dataclasses import dataclass
 from lm_tournament_eval.caching.cache import delete_cache
 
@@ -76,7 +78,7 @@ class Tournament:
     def tournament_evaluate(
         self,
         model: str,
-        lm: HFLM,
+        lm: LM,
         requests: Dict,
         eval_tasks: List,
         task_dict: Dict,

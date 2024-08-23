@@ -38,10 +38,10 @@ def parse_model_name(model_name) -> Tuple[str, str]:
         model = model_name[(idx+1):]
 
         model_type = model_type.lower()
-        assert(model_type in ['anthropic-completions'])
+        assert(model_type in ['anthropic', 'anthropic-chat', 'anthropic-chat-completions'])
 
         match model_type:
-            case "anthropic-completions":
+            case "anthropic" | "anthropic-chat" | "anthropic-chat-completions":
                 assert(model in _ANTHROPIC_MODELS)
                 return (model_type, model)
 
@@ -74,7 +74,7 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                             "device":  device,
                         },
                     )
-                case "anthropic-completions":
+                case "anthropic" | "anthropic-chat" | "anthropic-chat-completions":
                     lm = get_model(model_type).create_from_arg_obj(
                         model_args,
                         { }
@@ -100,7 +100,7 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                             "device": device,
                         }
                     )
-                case "anthropic-completions":
+                case "anthropic" | "anthropic-chat" | "anthropic-chat-completions":
                     lm = get_model(model_type).create_from_arg_string(
                         model_args,
                         { }
