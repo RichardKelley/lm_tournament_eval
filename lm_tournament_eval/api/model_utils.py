@@ -26,6 +26,27 @@ _ANTHROPIC_MODELS = [
     "claude-instant-1.2",
 ]
 
+_OPENAI_MODELS = [
+    "gpt-4o",
+    "gpt-4o-2024-05-13",
+    "gpt-4o-2024-08-06",
+    "chatgpt-4o-latest",
+    "gpt-4o-mini",
+    "gpt-4o-mini-2024-07-18",
+    "gpt-4-turbo",
+    "gpt-4-turbo-2024-04-09",
+    "gpt-4-turbo-preview",
+    "gpt-4-0125-preview",
+    "gpt-4-1106-preview",
+    "gpt-4",
+    "gpt-4-0613",
+    "gpt-4-0314",
+    "gpt-3.5-turbo-0125",
+    "gpt-3.5-turbo",
+    "gpt-3.5-turbo-1106",
+    "gpt-3.5-turbo-instruct"
+]
+
 def parse_model_name(model_name) -> Tuple[str, str]:
     """
     Given a model name that may be either a Hugging Face model path or a specification of the
@@ -38,11 +59,20 @@ def parse_model_name(model_name) -> Tuple[str, str]:
         model = model_name[(idx+1):]
 
         model_type = model_type.lower()
-        assert(model_type in ['anthropic', 'anthropic-chat', 'anthropic-chat-completions'])
+        assert(model_type in ['anthropic', 
+                              'anthropic-chat', 
+                              'anthropic-chat-completions',
+                              'openai-completions',
+                              'local-completions',
+                              'openai-chat-completions',
+                              'local-chat-completions'])
 
         match model_type:
             case "anthropic" | "anthropic-chat" | "anthropic-chat-completions":
                 assert(model in _ANTHROPIC_MODELS)
+                return (model_type, model)
+            case "openai-completions" | "local-completions" | "openai-chat-completions" | "local-chat-completions":
+                assert(model in _OPENAI_MODELS)
                 return (model_type, model)
 
     else:
@@ -79,6 +109,11 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                         model_args,
                         { }
                     )
+                case "openai-completions" | "local-completions" | "openai-chat-completions" | "local-chat-completions":
+                    lm = get_model(model_type).create_from_arg_obj(
+                        model_args,
+                        { }
+                    )
 
             
         else:
@@ -101,6 +136,11 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                         }
                     )
                 case "anthropic" | "anthropic-chat" | "anthropic-chat-completions":
+                    lm = get_model(model_type).create_from_arg_string(
+                        model_args,
+                        { }
+                    )
+                case "openai-completions" | "local-completions" | "openai-chat-completions" | "local-chat-completions":
                     lm = get_model(model_type).create_from_arg_string(
                         model_args,
                         { }
