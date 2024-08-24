@@ -14,28 +14,10 @@ from lm_tournament_eval.models.utils import retry_on_specific_exceptions
 
 import logging
 
+from lm_tournament_eval.models.utils import hash_args, CacheHook
+
 import json
 import hashlib
-
-### SQLite-based caching of LM responses
-def hash_args(attr, args):
-    dat = json.dumps([attr] + list(args))
-    return hashlib.sha256(dat.encode("utf-8")).hexdigest()
-
-class CacheHook:
-    def __init__(self, cachinglm) -> None:
-        if cachinglm is None:
-            self.dbdict = None
-            return
-
-        self.dbdict = cachinglm.dbdict
-
-    def add_partial(self, attr, req, res) -> None:
-        if self.dbdict is None:
-            return
-        hsh = hash_args(attr, req)
-        self.dbdict[hsh] = res
-
 
 def anthropic_completion(
     client,  #: anthropic.Anthropic,
