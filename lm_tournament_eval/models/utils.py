@@ -2,6 +2,30 @@ from typing import List, Type, Optional, Callable, Any
 import time
 from functools import wraps
 
+import collections
+
+import json
+import hashlib
+
+### SQLite-based caching of LM responses
+def hash_args(attr, args):
+    dat = json.dumps([attr] + list(args))
+    return hashlib.sha256(dat.encode("utf-8")).hexdigest()
+
+class CacheHook:
+    def __init__(self, cachinglm) -> None:
+        if cachinglm is None:
+            self.dbdict = None
+            return
+
+        self.dbdict = cachinglm.dbdict
+
+    def add_partial(self, attr, req, res) -> None:
+        if self.dbdict is None:
+            return
+        hsh = hash_args(attr, req)
+        self.dbdict[hsh] = res
+
 
 
 def retry_on_specific_exceptions(
@@ -42,3 +66,61 @@ def retry_on_specific_exceptions(
         return wrapper
 
     return decorator
+
+class Grouper:
+    """
+    takes an array `arr` and function `fn` and returns a dictionary
+    with keys fn(ob) for each ob in `arr` and with values `self.arr[key]` a list of all
+    objects in `arr` satisfying `key == fn(ob)`.
+    """
+
+    def __init__(self, arr, fn) -> None:
+        # self.orig_arr = arr
+        self.size = len(arr)
+        arr = list(enumerate(arr))
+
+        def group_return_dict(arr, fn):
+            res = collections.defaultdict(list)
+
+            for ob in arr:
+                res[fn(ob)].append(ob)
+            return res
+
+        arr = group_return_dict(arr, lambda x: fn(x[1]))
+
+        # self.arr has format Dict[Tuple[int, <entry from orig. arr>]]
+        self.arr = arr
+        self._grouped = None
+
+    def get_grouped(self):
+        # return the contents but not indices for our grouped dict.
+        if self._grouped:
+            return self._grouped
+        grouped = {}
+        for key in self.arr.keys():
+            # drop the index from each element of self.arr
+            grouped[key] = [y[1] for y in self.arr[key]]
+        self._grouped = grouped
+        return grouped
+
+    def get_original(self, grouped_dict):
+        # take in a grouped dictionary with e.g. results for each key listed
+        # in the same order as the instances in `self.arr`, and
+        # return the results in the same (single list) order as `self.orig_arr`.
+        res = [None] * self.size
+        cov = [False] * self.size
+        # orig = [None] * self.size
+
+        assert grouped_dict.keys() == self.arr.keys()
+
+        for key in grouped_dict.keys():
+            for (ind, _), v in zip(self.arr[key], grouped_dict[key]):
+                res[ind] = v
+                cov[ind] = True
+                # orig[ind] = _
+
+        assert all(cov)
+        # assert orig == self.orig_arr
+
+        return res
+
