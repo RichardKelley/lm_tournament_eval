@@ -12,6 +12,7 @@ from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, O
 from lm_tournament_eval.api.task import TaskConfig
 from lm_tournament_eval.tasks import TaskManager
 from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
+from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -57,6 +58,11 @@ def setup_parser() -> argparse.ArgumentParser:
     #                    help="Write scores back out to input file.")
     parser.add_argument("--elo_csv_out", type=str, default=None,
                         help="Path to CSV file to write updated ELO scores.")
+    
+    parser.add_argument("--file_schedule", type=str, default=None,
+                        help="Path to a file containing a CSV of match indices.")
+    parser.add_argument("--sample_size", type=int, default=None,
+                        help="Number of samples to draw per match. Triggers sampling with replacement.")
 
     return parser
 
@@ -133,10 +139,24 @@ def run_tournament():
 
     logging.info(f"Selected Tasks: {task_names}")
 
-    # TODO support caching?
-    #request_caching_args = request_caching_arg_to_dict(
-    #    cache_requests=args.cache_requests
-    #)
+    # set up scheduler
+    if args.file_schedule is not None and args.sample_size is not None:
+        logging.error("Cannot set file_schedule and sample_size at same time.")
+        sys.exit(1)
+
+    if args.file_schedule is not None:
+        logging.info("Using {args.file_schedule} for match schedule.")
+        scheduler = FileScheduler(args.file_schedule)
+    elif args.sample_size is not None:
+
+        if args.num_rounds is None:
+            logging.error("args.num_rounds cannot be None if args.sample_size is set")
+            sys.exit(1)
+
+        logging.info("Using {args.sample_size} for sample size.")
+        scheduler = SamplingScheduler(args.num_rounds, args.sample_size)
+    else:
+        scheduler = None
 
     args.tournament_name = "{}-{}-{}".format(datetime.datetime.now(), args.model0, args.model1)
     
@@ -195,7 +215,8 @@ def run_tournament():
             task_manager, 
             args.verbosity, 
             initial_elos,
-            args.elo_csv_out)
+            args.elo_csv_out,
+            scheduler)
 
         #logging.info(f"Running tournament {cfg}")
         tournament.run_tournament()
