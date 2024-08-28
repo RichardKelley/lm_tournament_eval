@@ -61,8 +61,8 @@ def setup_parser() -> argparse.ArgumentParser:
     
     parser.add_argument("--file_schedule", type=str, default=None,
                         help="Path to a file containing a CSV of match indices.")
-    parser.add_argument("--sample_size", type=int, default=None,
-                        help="Number of samples to draw per match. Triggers sampling with replacement.")
+    parser.add_argument("--sampling_schedule", type=bool, default=None,
+                        help="Triggers sampling with replacement.")
 
     return parser
 
@@ -140,21 +140,24 @@ def run_tournament():
     logging.info(f"Selected Tasks: {task_names}")
 
     # set up scheduler
-    if args.file_schedule is not None and args.sample_size is not None:
-        logging.error("Cannot set file_schedule and sample_size at same time.")
+    if args.file_schedule is not None and args.sampling_schedule is not None:
+        logging.error("Cannot set file_schedule and sampling_schedule at same time.")
         sys.exit(1)
 
     if args.file_schedule is not None:
         logging.info("Using {args.file_schedule} for match schedule.")
         scheduler = FileScheduler(args.file_schedule)
-    elif args.sample_size is not None:
+    elif args.sampling_schedule is not None and args.sampling_schedule:
+
+        if args.match_size is None:
+            logging.error("args.match_size cannot be None if args.sampling_schedule is True.")
 
         if args.num_rounds is None:
-            logging.error("args.num_rounds cannot be None if args.sample_size is set")
+            logging.error("args.num_rounds cannot be None if args.sampling_schedule is True")
             sys.exit(1)
 
-        logging.info("Using {args.sample_size} for sample size.")
-        scheduler = SamplingScheduler(args.num_rounds, args.sample_size)
+        logging.info("Using {args.match_size} for sample size.")
+        scheduler = SamplingScheduler(args.num_rounds, args.match_size)
     else:
         scheduler = None
 
@@ -218,13 +221,7 @@ def run_tournament():
             args.elo_csv_out,
             scheduler)
 
-        #logging.info(f"Running tournament {cfg}")
         tournament.run_tournament()
-
-        #newline = '\n'
-        # print(f"{results0}{newline*10}{results1}")
-
-    # save tournament results to disk.
 
 
 if __name__ == "__main__":
