@@ -15,7 +15,6 @@ import lm_tournament_eval.models
 from lm_tournament_eval.models.huggingface_model import TournamentHFLM
 
 from lm_tournament_eval.utils import (
-    eval_logger,
     handle_non_serializable,
     hash_string,
 )
@@ -26,6 +25,8 @@ from lm_tournament_eval.evaluator_utils import (
     get_subtask_list,
     prepare_print_tasks,
 )
+
+import logging
 
 def evaluate(
     lm: TournamentHFLM,
@@ -61,13 +62,11 @@ def evaluate(
     :return
         Dictionary of results
     """
-
-    eval_logger.setLevel(getattr(logging, f"{verbosity}"))
-
+    
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
     for reqtype, reqs in requests.items():
-        eval_logger.info(f"Running {reqtype} requests")
+        logging.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`
         cloned_reqs = []
         for req in reqs:
@@ -214,7 +213,7 @@ def evaluate(
                             and _higher_is_better[m] is not None
                             and _higher_is_better[m] != h
                         ):
-                            eval_logger.warning(
+                            logging.warning(
                                 f"Higher_is_better values for metric {m} in group {group} are not consistent. Defaulting to None."
                             )
                             _higher_is_better[m] = None
