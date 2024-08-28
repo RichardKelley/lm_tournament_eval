@@ -85,7 +85,7 @@ class SamplingScheduler(Scheduler):
             self.sample_size = self.task_size
 
     def __next__(self):
-        if self.current_round > self.rounds:
+        if self.current_round >= self.rounds:
             raise StopIteration
         else:
             next_match = random.sample(range(self.task_size), self.sample_size)
