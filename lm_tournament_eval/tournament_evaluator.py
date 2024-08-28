@@ -27,10 +27,12 @@ from lm_tournament_eval.evaluator_utils import (
 )
 
 import logging
+import collections
 
 def evaluate(
     lm: TournamentHFLM,
     requests,
+    task,
     eval_tasks,
     task_dict,
     padding_requests,
@@ -62,7 +64,7 @@ def evaluate(
     :return
         Dictionary of results
     """
-    
+
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
     for reqtype, reqs in requests.items():
@@ -91,7 +93,13 @@ def evaluate(
     ### Postprocess outputs ###
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output in eval_tasks:
-        task = task_output.task
+        task_output.logged_samples = []
+        task_output.sample_metrics = collections.defaultdict(list)
+
+        #if task_output.task_name == task.task_name:
+        #    task_output.task = task
+        #logging.info(f"task_output = {task_output.task}")
+        #task = task_output.task
         task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
