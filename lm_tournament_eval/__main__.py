@@ -55,8 +55,6 @@ def setup_parser() -> argparse.ArgumentParser:
     
     parser.add_argument("--elo_csv_in", type=str, default=None,
                         help="Path to CSV file with initial ELO scores.")
-    #parser.add_argument("--save_scores", type=bool, default=False,
-    #                    help="Write scores back out to input file.")
     parser.add_argument("--elo_csv_out", type=str, default=None,
                         help="Path to CSV file to write updated ELO scores.")
     
@@ -222,7 +220,6 @@ def run_tournament():
                               device=args.device,
                               limit=args.limit,
                               match_size=args.match_size,
-                              #cmd_filter=args.filter
                               cmd_filter=filter_list,
                               random_seed=args.random_seed,
                               numpy_random_seed=args.numpy_random_seed,
