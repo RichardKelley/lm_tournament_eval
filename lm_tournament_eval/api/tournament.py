@@ -226,7 +226,7 @@ class Tournament:
             original_task = deepcopy(task_dict[task_name])
 
             for match_schedule in self.scheduler:
-                logging.info(f"Current match: {match_schedule}")
+                logging.info(f"Current match indices: {match_schedule}")
 
                 subtask = create_subtask(original_task, schedule=match_schedule)
                 
@@ -269,7 +269,7 @@ class Tournament:
                 match_results = {}
                 if model0._rank == 0:
                     for i, task_name in enumerate([subtask.task_name]):
-                        rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
+                        rounds_per_task.append(len(results0["samples"][task_name])//self.scheduler.match_size)
                         match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
                                                                 model1_name=self.config.model1_name,
                                                                 model0_old_elo=self.elo.score_0,
@@ -278,4 +278,4 @@ class Tournament:
                                                                 model1_new_elo=self.elo.score_1)
                                                                 for i in range(rounds_per_task[i])]
                     #calculate ELO updates
-                    self.elo.online_elo_update(results0, results1, [subtask.task_name], self.config.match_size, match_results)
+                    self.elo.online_elo_update(results0, results1, [subtask.task_name], self.scheduler.match_size, match_results)
