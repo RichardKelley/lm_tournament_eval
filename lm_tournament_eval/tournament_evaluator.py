@@ -96,10 +96,6 @@ def evaluate(
         task_output.logged_samples = []
         task_output.sample_metrics = collections.defaultdict(list)
 
-        #if task_output.task_name == task.task_name:
-        #    task_output.task = task
-        #logging.info(f"task_output = {task_output.task}")
-        #task = task_output.task
         task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
@@ -154,7 +150,6 @@ def evaluate(
         # first gather logged samples across all ranks
         for task_output in eval_tasks:
             if log_samples:
-                # for task_name, task_samples in list(samples.items()):
                 full_samples = [None] * WORLD_SIZE if RANK == 0 else None
                 torch.distributed.gather_object(
                     obj=task_output.logged_samples,

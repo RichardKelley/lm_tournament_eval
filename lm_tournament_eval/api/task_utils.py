@@ -117,19 +117,12 @@ def prepare_tasks(tasks, task_manager, verbosity,
 
 
 def create_requests(lm, task, limit, 
-                    #schedule = None,
-                    #predict_only: bool = False, 
-                    #num_fewshot: Optional[int] = None,
-                    #fewshot_random_seed: int = 1234,
                     cache_requests: bool = False,
                     rewrite_requests_cache: bool = False,
                     apply_chat_template: bool = False,
                     fewshot_as_multiturn: bool = False,
                     system_instruction: Optional[str] = None,
                     write_out: bool = False,
-                    #log_samples: bool = True,
-                    #cmd_filter: str  = 'none',
-                    #gen_kwargs: str = None
     ):
 
     # tracks all Instances/requests a model must generate output on.
@@ -179,63 +172,10 @@ def create_requests(lm, task, limit,
         # compute number of pseudo-batches to pad with (FSDP/DDP require even batches among ranks)
         numpad = max(gathered_item) - gathered_item[lm.rank]
         # todo: may not account for padding in cases like SquadV2 which has multiple req types
-
-
-# START USE OF RANK
-
-    '''
-    for task_output in eval_tasks:
-        task: Task = task_output.task
-        limit = get_sample_size(task, limit)
-        task.build_all_requests(
-            schedule=schedule,
-            limit=limit,
-            rank=lm.rank,
-            world_size=lm.world_size,
-            cache_requests=cache_requests,
-            rewrite_requests_cache=rewrite_requests_cache,
-            system_instruction=system_instruction,
-            apply_chat_template=apply_chat_template,
-            fewshot_as_multiturn=fewshot_as_multiturn,
-            chat_template=getattr(lm, "apply_chat_template")
-            if apply_chat_template
-            else None,
-            tokenizer_name=getattr(lm, "tokenizer_name", "")
-            if apply_chat_template
-            else "",
-        )
-        eval_logger.debug(
-            f"Task: {task_output.task_name}; number of requests on this rank: {len(task.instances)}"
-        )
-        if write_out:
-            print_writeout(task)
-        # aggregate Instances by LM method requested to get output.
-        for instance in task.instances:
-            reqtype = instance.request_type
-            requests[reqtype].append(instance)
-
-        if lm.world_size > 1:
-            instances_rnk = torch.tensor(len(task._instances), device=lm.device)
-            gathered_item = (
-                lm.accelerator.gather(instances_rnk).cpu().detach().numpy().tolist()
-            )
-            # "multiple_choice" task types dispatch (several) "loglikelihood" request types
-            reqtype = (
-                "loglikelihood"
-                if task.OUTPUT_TYPE == "multiple_choice"
-                else task.OUTPUT_TYPE
-            )
-            # compute number of pseudo-batches to pad with (FSDP/DDP require even batches among ranks)
-            numpad = max(gathered_item) - gathered_item[lm.rank]
-            # todo: may not account for padding in cases like SquadV2 which has multiple req types
-            padding_requests[reqtype] += numpad
-    '''
         
     return requests, padding_requests
 
-
-#########
-# Tentative task algebra code.
+# task algebra code.
 
 def create_subtask(input_task : Task, schedule : List[int]) -> Task:
 
