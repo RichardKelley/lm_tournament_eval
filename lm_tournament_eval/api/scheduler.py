@@ -6,7 +6,10 @@ import logging
 
 class Scheduler(abc.ABC):
     def __init__(self) -> None:
-        pass
+        self.current_idx = 0
+
+    def reset(self):
+        self.current_idx = 0
 
     def __iter__(self):
         return self
@@ -23,7 +26,6 @@ class FileScheduler(Scheduler):
         super().__init__()
         self.path = path
         self.idxs = []
-        self.current_idx = 0
 
         with open(path, 'r') as f:
             lines = f.readlines()
@@ -60,9 +62,9 @@ class SamplingScheduler(Scheduler):
             n (int):
                 The total number of possible instances.
         '''
+        super().__init__()
         assert(rounds > 0)
         self.rounds = rounds
-        self.current_round = 0
 
         if n is not None:
             assert(n > 0)
@@ -84,11 +86,13 @@ class SamplingScheduler(Scheduler):
             logging.warn(f"Revising sample size from {self.sample_size} to {self.task_size} to handle smaller limit.")
             self.sample_size = self.task_size
 
+        self.reset()
+
     def __next__(self):
-        if self.current_round >= self.rounds:
+        if self.current_idx >= self.rounds:
             raise StopIteration
         else:
-            next_match = random.sample(range(self.task_size), self.sample_size)
-            self.current_round += 1
-            return next_match
+            self.current_idx += 1
+            return random.sample(range(self.task_size), self.sample_size)
+
         
