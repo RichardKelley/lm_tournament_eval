@@ -22,7 +22,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model1", "-m1", type=str, help="Name of second competing model.")
     parser.add_argument("--model1_args", type=str, help="Arguments for model 1.")
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
-    parser.add_argument("--filter", default='none', type=str)
+    parser.add_argument("--filter", default='none', type=str, metavar="filter1,filter2")
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--batch_size", "-b", default=1, type=int)
     parser.add_argument("--gen_kwargs", type=str, default=None, help=("String arguments for model generation on greedy_until tasks, e.g. `temperature=0,top_k=0,top_p=0`."))
@@ -38,6 +38,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--random_seed", type=int, default=1234)
     parser.add_argument("--numpy_random_seed", type=int, default=1234)
     parser.add_argument("--torch_random_seed", type=int, default=1234)
+    parser.add_argument("--fewshot_random_seed", type=int, default=1234)
     parser.add_argument("--include_path", type=str, default=None, metavar="DIR", 
                         help="Additional path to include if there are external tasks to include.")
     parser.add_argument("--trust_remote_code",
@@ -105,6 +106,10 @@ def run_tournament():
         else:
             task_list = args.tasks.split(",")
             task_names = task_manager.match_tasks(task_list)
+
+            if set(task_list) == set(task_names):
+                task_names = task_list
+
             for task in [task for task in task_list if task not in task_names]:
                 if os.path.isfile(task):
                     config = utils.load_yaml_config(task)
@@ -138,6 +143,15 @@ def run_tournament():
         args.model_args = args.model_args + ",trust_remote_code=True"
 
     logging.info(f"Selected Tasks: {task_names}")
+
+    if ',' in args.filter:
+        filter_list = args.filter.split(',')
+        if len(filter_list) != len(task_names):
+            raise ValueError(
+                f"Filter list length {len(filter_list)} does not match task list length {len(task_list)}. Provide one filter per task."
+            )
+    else:
+        filter_list = [args.filter]
 
     # set up scheduler
     if args.file_schedule is not None and args.sampling_schedule is not None:
@@ -208,7 +222,12 @@ def run_tournament():
                               device=args.device,
                               limit=args.limit,
                               match_size=args.match_size,
-                              cmd_filter=args.filter
+                              #cmd_filter=args.filter
+                              cmd_filter=filter_list,
+                              random_seed=args.random_seed,
+                              numpy_random_seed=args.numpy_random_seed,
+                              torch_random_seed=args.torch_random_seed,
+                              fewshot_random_seed=args.fewshot_random_seed
                              )
 
         #create tournament
