@@ -6,26 +6,76 @@ import logging
 
 class Scheduler(abc.ABC):
     def __init__(self) -> None:
-        self.current_idx = 0
+        self.instances_seen = 0
+        self.max_instances = float('inf')
+
+        self.match_size = 0
+        self.task_size = float('inf')
+        self.limit = float('inf')
 
     def reset(self):
-        self.current_idx = 0
+        self.match_size = self.original_match_size
+        self.instances_seen = 0
 
     def __iter__(self):
         return self
     
     def set_task_size(self, n):
-        self.task_size = n        
+        self.task_size = n
+        if self.task_size < self.match_size:
+            self.match_size = self.task_size
+
+        self.reset()
+
+    def set_match_size(self, new_match_size):
+        assert(new_match_size > 0)
+
+        if self.limit < new_match_size:
+            self.match_size = self.limit
+        else:
+            self.match_size = new_match_size
+
+    def set_limit(self, new_limit):
+        assert(new_limit > 0)
+        self.limit = new_limit
+        if self.limit < self.match_size:
+            self.match_size = self.limit
     
     @abc.abstractmethod
     def __next__(self):
         pass
+
+class DefaultScheduler(Scheduler):
+    def __init__(self, rounds : int, match_size : int):
+        super().__init__()
+
+        assert(rounds > 0)
+        self.rounds = rounds
+
+        assert(match_size > 0)
+        self.original_match_size = match_size
+        self.match_size = match_size
+
+        self.max_instances = self.rounds * self.match_size        
+
+
+    def __next__(self):
+        if self.instances_seen >= self.limit or self.instances_seen >= self.max_instances:
+            raise StopIteration
+        
+        if self.instances_seen + self.match_size > self.limit:
+            self.set_match_size(self.limit - self.instances_seen)
+            
+        idxs = list(range(self.instances_seen, self.instances_seen+self.match_size))
+        self.instances_seen += len(idxs)
+        return idxs
 
 class FileScheduler(Scheduler):
     def __init__(self, path):
         super().__init__()
         self.path = path
         self.idxs = []
+        self.current_idx = 0
 
         with open(path, 'r') as f:
             lines = f.readlines()
@@ -43,7 +93,7 @@ class FileScheduler(Scheduler):
             return next_idxs
 
 class SamplingScheduler(Scheduler):
-    def __init__(self, rounds : int, sample_size : int, n = None):
+    def __init__(self, rounds : int, match_size : int):
         '''
         A SamplingScheduler uses random sampling with replacement to generate
         a set of indices for a match between two models.
@@ -56,43 +106,34 @@ class SamplingScheduler(Scheduler):
         Args:
             rounds (int):
                 The number of rounds to go. 
-            sample_size (int):
+            match_size (int):
                 The requested sample size. May be revised down if the requested sample
                 size is greater than the number of possible instances.
             n (int):
                 The total number of possible instances.
         '''
         super().__init__()
+
         assert(rounds > 0)
         self.rounds = rounds
 
-        if n is not None:
-            assert(n > 0)
-        self.task_size = n
+        assert(match_size > 0)
+        self.original_match_size = match_size
+        self.set_match_size(match_size)
 
-        self.requested_sample_size = sample_size
-
-        assert(self.requested_sample_size > 0)
-        if self.task_size is not None:
-            self.sample_size = min(self.requested_sample_size, self.task_size)
-        else:
-            self.sample_size = sample_size
-
-    def set_task_size(self, n : int):
-        assert(n > 0)
-        self.task_size = n
-
-        if self.sample_size > self.task_size:
-            logging.warn(f"Revising sample size from {self.sample_size} to {self.task_size} to handle smaller limit.")
-            self.sample_size = self.task_size
-
-        self.reset()
+        self.max_instances = self.rounds * self.match_size
 
     def __next__(self):
-        if self.current_idx >= self.rounds:
+        if self.instances_seen >= self.limit or self.instances_seen >= self.max_instances:
             raise StopIteration
-        else:
-            self.current_idx += 1
-            return random.sample(range(self.task_size), self.sample_size)
+        
+        if self.instances_seen + self.match_size > self.limit:
+            self.set_match_size(self.limit - self.instances_seen)
+
+        idxs = random.sample(range(self.task_size), self.match_size)
+            
+        self.instances_seen += len(idxs)
+            
+        return idxs
 
         

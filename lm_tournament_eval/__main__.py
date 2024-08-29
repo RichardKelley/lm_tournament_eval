@@ -12,7 +12,7 @@ from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, O
 from lm_tournament_eval.api.task import TaskConfig
 from lm_tournament_eval.tasks import TaskManager
 from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
-from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
+from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler, DefaultScheduler
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -169,9 +169,13 @@ def run_tournament():
             sys.exit(1)
 
         logging.info("Using {args.match_size} for sample size.")
-        scheduler = SamplingScheduler(args.num_rounds, args.match_size)
+        scheduler = SamplingScheduler(rounds=args.num_rounds, match_size=args.match_size)
     else:
-        scheduler = None
+        scheduler = DefaultScheduler(rounds=args.num_rounds, match_size=args.match_size)
+
+    if args.limit is not None:
+        scheduler.set_limit(args.limit)
+
 
     args.tournament_name = "{}-{}-{}".format(datetime.datetime.now(), args.model0, args.model1)
     
