@@ -47,7 +47,7 @@ def prepare_tasks(tasks, task_manager, verbosity,
             filter_names.append(filter.name)
     if filter_found is False:
         raise ValueError(
-            f"User specified filter not found in the task yaml. Available filters are: {filter_names}"
+            f"User specified filter {cmd_filter} not found in the task yaml. Available filters are: {filter_names}"
         )
     # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
     # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)
