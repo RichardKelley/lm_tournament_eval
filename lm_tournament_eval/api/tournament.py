@@ -11,8 +11,8 @@ from hflm import LM
 from dataclasses import dataclass
 from lm_tournament_eval.caching.cache import delete_cache
 
-from lm_tournament_eval.tasks import TaskManager
-from lm_tournament_eval.api.task_utils import create_requests
+from lm_tournament_eval.tasks import TaskManager, get_task_dict
+from lm_tournament_eval.api.task_utils import prepare_tasks, create_requests, create_subtask
 from lm_tournament_eval.api.model_utils import load_model, parse_model_name
 from lm_tournament_eval.tournament_evaluator import evaluate
 from lm_tournament_eval.utils import simple_parse_args_string
@@ -22,12 +22,16 @@ from lm_tournament_eval.loggers import EvaluationTracker
 from lm_tournament_eval.api.elo import ELO
 from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
+from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
+from lm_tournament_eval.api.task import Task
 
 from lm_tournament_eval.loggers.utils import (
      add_env_info, 
      add_tokenizer_info, 
      get_git_commit_hash
 )
+
+from copy import deepcopy
 
 @dataclass
 class TournamentConfig:
@@ -44,14 +48,19 @@ class TournamentConfig:
     limit : int
     match_size : int
     cmd_filter : str
+    random_seed : int
+    numpy_random_seed : int
+    torch_random_seed : int
+    fewshot_random_seed : int
 
 class Tournament:
-    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None):
+    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None, scheduler = None):
         self.config = config
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
         self.elo_out = elo_out
+        self.scheduler = scheduler
 
         # get model0_key
         model0_bpw = '16'
@@ -80,6 +89,7 @@ class Tournament:
         model: str,
         lm: LM,
         requests: Dict,
+        task : Task,
         eval_tasks: List,
         task_dict: Dict,
         padding_requests: Dict,
@@ -91,10 +101,6 @@ class Tournament:
         limit: Optional[Union[int, float]] = None,
         bootstrap_iters: int = 100000,
         gen_kwargs: Optional[str] = None,
-        random_seed: int = 0,
-        numpy_random_seed: int = 1234,
-        torch_random_seed: int = 1234,
-        fewshot_random_seed: int = 1234
     ) -> Dict:
 
         start_date = time.time()
@@ -103,23 +109,6 @@ class Tournament:
             logging.info("Deleteing requests cache.")
             delete_cache()
 
-        seed_message = []
-
-        if random_seed is not None:
-            seed_message.append(f"Setting random seed to {random_seed}")
-            random.seed(random_seed)
-
-        if numpy_random_seed is not None:
-            seed_message.append(f"Setting numpy seed to {numpy_random_seed}")
-            np.random.seed(numpy_random_seed)
-
-        if torch_random_seed is not None:
-            seed_message.append(f"Setting torch manual seed to {torch_random_seed}")
-            torch.manual_seed(torch_random_seed)
-
-        if seed_message:
-            logging.info(" | ".join(seed_message))
-        
         if gen_kwargs is not None:
             gen_kwargs = simple_parse_args_string(gen_kwargs)
             logging.warning(
@@ -134,6 +123,7 @@ class Tournament:
         results = evaluate(
             lm=lm,
             requests=requests,
+            task=task,
             eval_tasks=eval_tasks,
             task_dict=task_dict,
             padding_requests=padding_requests,
@@ -168,10 +158,10 @@ class Tournament:
                     "limit": limit,
                     "bootstrap_iters": bootstrap_iters,
                     "gen_kwargs": gen_kwargs,
-                    "random_seed": random_seed,
-                    "numpy_seed": numpy_random_seed,
-                    "torch_seed": torch_random_seed,
-                    "fewshot_seed": fewshot_random_seed,
+                    "random_seed": self.config.random_seed,
+                    "numpy_seed": self.config.numpy_random_seed,
+                    "torch_seed": self.config.torch_random_seed,
+                    "fewshot_seed": self.config.fewshot_random_seed,
                 }
             )
 
@@ -185,6 +175,24 @@ class Tournament:
         return results
 
     def run_tournament(self):
+
+        seed_message = []
+
+        if self.config.random_seed is not None:
+            seed_message.append(f"Setting random seed to {self.config.random_seed}")
+            random.seed(self.config.random_seed)
+
+        if self.config.numpy_random_seed is not None:
+            seed_message.append(f"Setting numpy seed to {self.config.numpy_random_seed}")
+            np.random.seed(self.config.numpy_random_seed)
+
+        if self.config.torch_random_seed is not None:
+            seed_message.append(f"Setting torch manual seed to {self.config.torch_random_seed}")
+            torch.manual_seed(self.config.torch_random_seed)
+
+        if seed_message:
+            logging.info(" | ".join(seed_message))
+        
         model0_type, model0_name = parse_model_name(self.config.model0_name)
         model0 = load_model(model0_type, 
                             model0_name,
@@ -201,56 +209,73 @@ class Tournament:
                             max_batch_size=self.config.batch_size,
                             device=self.config.device)
 
-        requests0, eval_tasks0, task_dict0, padding_reqests0 = create_requests(model0,
-                                                                               self.tasks,
-                                                                               self.task_manager,
-                                                                               self.verbosity,
-                                                                               self.config.limit,
-                                                                               cmd_filter=self.config.cmd_filter,
-                                                                               gen_kwargs=self.config.gen_kwargs)
-                #TODO: add all the other params here so that build_all_requests is happy 
-        requests1, eval_tasks1, task_dict1, padding_reqests1 = create_requests(model1,
-                                                                               self.tasks,
-                                                                               self.task_manager,
-                                                                               self.verbosity,
-                                                                               self.config.limit,
-                                                                               cmd_filter=self.config.cmd_filter,
-                                                                               gen_kwargs=self.config.gen_kwargs)
-                #TODO: add all the other params here so that build_all_requests is happy 
+        for task_name in self.tasks:
+            logging.info(f"Current task: {task_name}")
 
-        results0 = self.tournament_evaluate(model=self.config.model0_name,
-                                            lm=model0,
-                                            model_args=self.config.model0_args,
-                                            requests=requests0,
-                                            eval_tasks=eval_tasks0,
-                                            task_dict=task_dict0,
-                                            padding_requests=padding_reqests0,
-                                            batch_size=self.config.batch_size,
-                                            device=self.config.device,
-                                            limit=self.config.limit
-                                        )
-        results1 = self.tournament_evaluate(model=self.config.model1_name,
-                                            lm=model1,
-                                            model_args=self.config.model1_args,
-                                            requests=requests1,
-                                            eval_tasks=eval_tasks1,
-                                            task_dict=task_dict1,
-                                            padding_requests=padding_reqests1,
-                                            batch_size=self.config.batch_size,
-                                            device=self.config.device,
-                                            limit=self.config.limit
-                                        )
-        rounds_per_task = []
-        match_results = {}
-        if model0._rank == 0:
-            for i,task_name in enumerate(self.config.task_names):
-                rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
-                match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
-                                                        model1_name=self.config.model1_name,
-                                                        model0_old_elo=self.elo.score_0,
-                                                        model0_new_elo=self.elo.score_0,
-                                                        model1_old_elo=self.elo.score_1,
-                                                        model1_new_elo=self.elo.score_1)
-                                                        for i in range(rounds_per_task[i])]
-            #calculate ELO updates
-            self.elo.online_elo_update(results0, results1, self.config.task_names, self.config.match_size, match_results)
+            task_idx = self.tasks.index(task_name)
+            filter = self.config.cmd_filter[task_idx]
+
+            eval_tasks, task_dict = prepare_tasks([task_name], 
+                                                  self.task_manager, 
+                                                  self.verbosity,
+                                                  cmd_filter=filter,
+                                                  gen_kwargs=self.config.gen_kwargs)
+
+            self.scheduler.set_task_size(len(task_dict[task_name].eval_docs))
+
+            original_task = deepcopy(task_dict[task_name])
+
+            for match_schedule in self.scheduler:
+                logging.info(f"Current match: {match_schedule}")
+
+                subtask = create_subtask(original_task, schedule=match_schedule)
+                
+
+                requests0, padding_reqests0 = create_requests(model0, 
+                                                              task=subtask,
+                                                              limit=self.config.limit)
+
+                results0 = self.tournament_evaluate(model=self.config.model0_name,
+                                                    lm=model0,
+                                                    model_args=self.config.model0_args,
+                                                    requests=requests0,
+                                                    task=subtask,
+                                                    eval_tasks=eval_tasks,
+                                                    task_dict=task_dict,
+                                                    padding_requests=padding_reqests0,
+                                                    batch_size=self.config.batch_size,
+                                                    device=self.config.device,
+                                                    limit=self.config.limit
+                                                )
+                        
+                requests1, padding_reqests1 = create_requests(model1,
+                                                              task=subtask,
+                                                              limit=self.config.limit)
+
+                results1 = self.tournament_evaluate(model=self.config.model1_name,
+                                                    lm=model1,
+                                                    model_args=self.config.model1_args,
+                                                    requests=requests1,
+                                                    task=subtask,
+                                                    eval_tasks=eval_tasks,
+                                                    task_dict=task_dict,
+                                                    padding_requests=padding_reqests1,
+                                                    batch_size=self.config.batch_size,
+                                                    device=self.config.device,
+                                                    limit=self.config.limit
+                                                )
+
+                rounds_per_task = []
+                match_results = {}
+                if model0._rank == 0:
+                    for i, task_name in enumerate([subtask.task_name]):
+                        rounds_per_task.append(len(results0["samples"][task_name])//self.config.match_size)
+                        match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
+                                                                model1_name=self.config.model1_name,
+                                                                model0_old_elo=self.elo.score_0,
+                                                                model0_new_elo=self.elo.score_0,
+                                                                model1_old_elo=self.elo.score_1,
+                                                                model1_new_elo=self.elo.score_1)
+                                                                for i in range(rounds_per_task[i])]
+                    #calculate ELO updates
+                    self.elo.online_elo_update(results0, results1, [subtask.task_name], self.config.match_size, match_results)
