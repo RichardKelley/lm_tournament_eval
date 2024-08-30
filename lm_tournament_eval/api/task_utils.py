@@ -14,22 +14,17 @@ from lm_tournament_eval.api.task import Task
 from lm_tournament_eval.utils import eval_logger
 from collections import defaultdict
 from typing import Optional, Union, Dict, List, Tuple
+import logging
+from copy import deepcopy
 
 
-def create_requests(lm, tasks, task_manager, verbosity, limit, 
+def prepare_tasks(tasks, task_manager, verbosity, 
                     predict_only: bool = False, 
                     num_fewshot: Optional[int] = None,
                     fewshot_random_seed: int = 1234,
-                    cache_requests: bool = False,
-                    rewrite_requests_cache: bool = False,
-                    apply_chat_template: bool = False,
-                    fewshot_as_multiturn: bool = False,
-                    system_instruction: Optional[str] = None,
-                    write_out: bool = False,
                     log_samples: bool = True,
                     cmd_filter: str  = 'none',
-                    gen_kwargs: str = None
-    ):
+                    gen_kwargs: str = None):
     if task_manager is None:
         task_manager = TaskManager(verbosity)
 
@@ -52,7 +47,7 @@ def create_requests(lm, tasks, task_manager, verbosity, limit,
             filter_names.append(filter.name)
     if filter_found is False:
         raise ValueError(
-            f"User specified filter not found in the task yaml. Available filters are: {filter_names}"
+            f"User specified filter {cmd_filter} not found in the task yaml. Available filters are: {filter_names}"
         )
     # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
     # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)
@@ -109,12 +104,6 @@ def create_requests(lm, tasks, task_manager, verbosity, limit,
 
     task_dict = _adjust_config(task_dict)
 
-    # tracks all Instances/requests a model must generate output on.
-    requests = defaultdict(list)
-    # stores the amount to pad out reqs per req. type so that
-    # number of fwd passes per distributed rank is equal
-    padding_requests = defaultdict(int)
-
     # get lists of group hierarchy and each type of request
     eval_tasks = get_task_list(task_dict)
     if not log_samples:
@@ -123,50 +112,79 @@ def create_requests(lm, tasks, task_manager, verbosity, limit,
             for task_output in eval_tasks
         ):
             raise ValueError("log_samples must be True for 'bypass' metric-only tasks")
-
-    for task_output in eval_tasks:
-        task: Task = task_output.task
-        limit = get_sample_size(task, limit)
-        task.build_all_requests(
-            limit=limit,
-            rank=lm.rank,
-            world_size=lm.world_size,
-            cache_requests=cache_requests,
-            rewrite_requests_cache=rewrite_requests_cache,
-            system_instruction=system_instruction,
-            apply_chat_template=apply_chat_template,
-            fewshot_as_multiturn=fewshot_as_multiturn,
-            chat_template=getattr(lm, "apply_chat_template")
-            if apply_chat_template
-            else None,
-            tokenizer_name=getattr(lm, "tokenizer_name", "")
-            if apply_chat_template
-            else "",
-        )
-        eval_logger.debug(
-            f"Task: {task_output.task_name}; number of requests on this rank: {len(task.instances)}"
-        )
-        if write_out:
-            print_writeout(task)
-        # aggregate Instances by LM method requested to get output.
-        for instance in task.instances:
-            reqtype = instance.request_type
-            requests[reqtype].append(instance)
-
-        if lm.world_size > 1:
-            instances_rnk = torch.tensor(len(task._instances), device=lm.device)
-            gathered_item = (
-                lm.accelerator.gather(instances_rnk).cpu().detach().numpy().tolist()
-            )
-            # "multiple_choice" task types dispatch (several) "loglikelihood" request types
-            reqtype = (
-                "loglikelihood"
-                if task.OUTPUT_TYPE == "multiple_choice"
-                else task.OUTPUT_TYPE
-            )
-            # compute number of pseudo-batches to pad with (FSDP/DDP require even batches among ranks)
-            numpad = max(gathered_item) - gathered_item[lm.rank]
-            # todo: may not account for padding in cases like SquadV2 which has multiple req types
-            padding_requests[reqtype] += numpad
         
-    return requests, eval_tasks, task_dict, padding_requests
+    return eval_tasks, task_dict
+
+
+def create_requests(lm, task, limit, 
+                    cache_requests: bool = False,
+                    rewrite_requests_cache: bool = False,
+                    apply_chat_template: bool = False,
+                    fewshot_as_multiturn: bool = False,
+                    system_instruction: Optional[str] = None,
+                    write_out: bool = False,
+    ):
+
+    # tracks all Instances/requests a model must generate output on.
+    requests = defaultdict(list)
+    # stores the amount to pad out reqs per req. type so that
+    # number of fwd passes per distributed rank is equal
+    padding_requests = defaultdict(int)
+
+    limit = get_sample_size(task, limit)
+    task.build_all_requests(
+        limit=limit,
+        rank=lm.rank,
+        world_size=lm.world_size,
+        cache_requests=cache_requests,
+        rewrite_requests_cache=rewrite_requests_cache,
+        system_instruction=system_instruction,
+        apply_chat_template=apply_chat_template,
+        fewshot_as_multiturn=fewshot_as_multiturn,
+        chat_template=getattr(lm, "apply_chat_template")
+        if apply_chat_template
+        else None,
+        tokenizer_name=getattr(lm, "tokenizer_name", "")
+        if apply_chat_template
+        else "",
+    )
+    logging.debug(
+        f"Task: {task.task_name}; number of requests on this rank: {len(task.instances)}"
+    )
+    if write_out:
+        print_writeout(task)
+    # aggregate Instances by LM method requested to get output.
+    for instance in task.instances:
+        reqtype = instance.request_type
+        requests[reqtype].append(instance)
+
+    if lm.world_size > 1:
+        instances_rnk = torch.tensor(len(task._instances), device=lm.device)
+        gathered_item = (
+            lm.accelerator.gather(instances_rnk).cpu().detach().numpy().tolist()
+        )
+        # "multiple_choice" task types dispatch (several) "loglikelihood" request types
+        reqtype = (
+            "loglikelihood"
+            if task.OUTPUT_TYPE == "multiple_choice"
+            else task.OUTPUT_TYPE
+        )
+        # compute number of pseudo-batches to pad with (FSDP/DDP require even batches among ranks)
+        numpad = max(gathered_item) - gathered_item[lm.rank]
+        # todo: may not account for padding in cases like SquadV2 which has multiple req types
+        
+    return requests, padding_requests
+
+# task algebra code.
+
+def create_subtask(input_task : Task, schedule : List[int]) -> Task:
+
+    subtask = deepcopy(input_task)
+
+    for key in subtask.dataset.keys():
+        if key not in [subtask.config.validation_split, subtask.config.test_split]:
+            continue
+        subtask.dataset[key] = subtask.dataset[key].select(schedule)
+    
+    return subtask
+

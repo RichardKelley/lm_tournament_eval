@@ -15,7 +15,6 @@ import lm_tournament_eval.models
 from lm_tournament_eval.models.huggingface_model import TournamentHFLM
 
 from lm_tournament_eval.utils import (
-    eval_logger,
     handle_non_serializable,
     hash_string,
 )
@@ -27,9 +26,13 @@ from lm_tournament_eval.evaluator_utils import (
     prepare_print_tasks,
 )
 
+import logging
+import collections
+
 def evaluate(
     lm: TournamentHFLM,
     requests,
+    task,
     eval_tasks,
     task_dict,
     padding_requests,
@@ -62,12 +65,10 @@ def evaluate(
         Dictionary of results
     """
 
-    eval_logger.setLevel(getattr(logging, f"{verbosity}"))
-
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
     for reqtype, reqs in requests.items():
-        eval_logger.info(f"Running {reqtype} requests")
+        logging.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`
         cloned_reqs = []
         for req in reqs:
@@ -92,7 +93,9 @@ def evaluate(
     ### Postprocess outputs ###
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output in eval_tasks:
-        task = task_output.task
+        task_output.logged_samples = []
+        task_output.sample_metrics = collections.defaultdict(list)
+
         task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
@@ -147,7 +150,6 @@ def evaluate(
         # first gather logged samples across all ranks
         for task_output in eval_tasks:
             if log_samples:
-                # for task_name, task_samples in list(samples.items()):
                 full_samples = [None] * WORLD_SIZE if RANK == 0 else None
                 torch.distributed.gather_object(
                     obj=task_output.logged_samples,
@@ -214,7 +216,7 @@ def evaluate(
                             and _higher_is_better[m] is not None
                             and _higher_is_better[m] != h
                         ):
-                            eval_logger.warning(
+                            logging.warning(
                                 f"Higher_is_better values for metric {m} in group {group} are not consistent. Defaulting to None."
                             )
                             _higher_is_better[m] = None

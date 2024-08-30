@@ -12,6 +12,7 @@ from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, O
 from lm_tournament_eval.api.task import TaskConfig
 from lm_tournament_eval.tasks import TaskManager
 from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
+from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler, DefaultScheduler
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -21,7 +22,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model1", "-m1", type=str, help="Name of second competing model.")
     parser.add_argument("--model1_args", type=str, help="Arguments for model 1.")
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
-    parser.add_argument("--filter", default='none', type=str)
+    parser.add_argument("--filter", default='none', type=str, metavar="filter1,filter2")
     parser.add_argument("--num_rounds", default=1, type=int)
     parser.add_argument("--batch_size", "-b", default=1, type=int)
     parser.add_argument("--gen_kwargs", type=str, default=None, help=("String arguments for model generation on greedy_until tasks, e.g. `temperature=0,top_k=0,top_p=0`."))
@@ -37,6 +38,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--random_seed", type=int, default=1234)
     parser.add_argument("--numpy_random_seed", type=int, default=1234)
     parser.add_argument("--torch_random_seed", type=int, default=1234)
+    parser.add_argument("--fewshot_random_seed", type=int, default=1234)
     parser.add_argument("--include_path", type=str, default=None, metavar="DIR", 
                         help="Additional path to include if there are external tasks to include.")
     parser.add_argument("--trust_remote_code",
@@ -53,10 +55,13 @@ def setup_parser() -> argparse.ArgumentParser:
     
     parser.add_argument("--elo_csv_in", type=str, default=None,
                         help="Path to CSV file with initial ELO scores.")
-    #parser.add_argument("--save_scores", type=bool, default=False,
-    #                    help="Write scores back out to input file.")
     parser.add_argument("--elo_csv_out", type=str, default=None,
                         help="Path to CSV file to write updated ELO scores.")
+    
+    parser.add_argument("--file_schedule", type=str, default=None,
+                        help="Path to a file containing a CSV of match indices.")
+    parser.add_argument("--sampling_schedule", type=bool, default=None,
+                        help="Triggers sampling with replacement.")
 
     return parser
 
@@ -99,6 +104,10 @@ def run_tournament():
         else:
             task_list = args.tasks.split(",")
             task_names = task_manager.match_tasks(task_list)
+
+            if set(task_list) == set(task_names):
+                task_names = task_list
+
             for task in [task for task in task_list if task not in task_names]:
                 if os.path.isfile(task):
                     config = utils.load_yaml_config(task)
@@ -133,10 +142,33 @@ def run_tournament():
 
     logging.info(f"Selected Tasks: {task_names}")
 
-    # TODO support caching?
-    #request_caching_args = request_caching_arg_to_dict(
-    #    cache_requests=args.cache_requests
-    #)
+    if ',' in args.filter:
+        filter_list = args.filter.split(',')
+        if len(filter_list) != len(task_names):
+            raise ValueError(
+                f"Filter list length {len(filter_list)} does not match task list length {len(task_list)}. Provide one filter per task."
+            )
+    else:
+        filter_list = [args.filter]
+
+    # set up scheduler
+    if args.file_schedule is not None and args.sampling_schedule is not None:
+        logging.error("Cannot set file_schedule and sampling_schedule at same time.")
+        sys.exit(1)
+
+    if args.file_schedule is not None:
+        logging.info("Using {args.file_schedule} for match schedule.")
+        scheduler = FileScheduler(args.file_schedule)
+    elif args.sampling_schedule is not None and args.sampling_schedule:
+
+        logging.info("Using {args.match_size} for sample size.")
+        scheduler = SamplingScheduler(rounds=args.num_rounds, match_size=args.match_size)
+    else:
+        scheduler = DefaultScheduler(rounds=args.num_rounds, match_size=args.match_size)
+
+    if args.limit is not None:
+        scheduler.set_limit(args.limit)
+
 
     args.tournament_name = "{}-{}-{}".format(datetime.datetime.now(), args.model0, args.model1)
     
@@ -185,7 +217,11 @@ def run_tournament():
                               device=args.device,
                               limit=args.limit,
                               match_size=args.match_size,
-                              cmd_filter=args.filter
+                              cmd_filter=filter_list,
+                              random_seed=args.random_seed,
+                              numpy_random_seed=args.numpy_random_seed,
+                              torch_random_seed=args.torch_random_seed,
+                              fewshot_random_seed=args.fewshot_random_seed
                              )
 
         #create tournament
@@ -195,15 +231,10 @@ def run_tournament():
             task_manager, 
             args.verbosity, 
             initial_elos,
-            args.elo_csv_out)
+            args.elo_csv_out,
+            scheduler)
 
-        #logging.info(f"Running tournament {cfg}")
         tournament.run_tournament()
-
-        #newline = '\n'
-        # print(f"{results0}{newline*10}{results1}")
-
-    # save tournament results to disk.
 
 
 if __name__ == "__main__":
