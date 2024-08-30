@@ -1,3 +1,5 @@
 from . import (
-    huggingface_model
+    huggingface_model,
+    anthropic,
+    openai
 )

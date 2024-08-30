@@ -6,12 +6,14 @@ import random
 import numpy as np
 import torch
 
+from hflm import LM
+
 from dataclasses import dataclass
 from lm_tournament_eval.caching.cache import delete_cache
 
 from lm_tournament_eval.tasks import TaskManager
 from lm_tournament_eval.api.task_utils import create_requests
-from lm_tournament_eval.api.model_utils import load_model
+from lm_tournament_eval.api.model_utils import load_model, parse_model_name
 from lm_tournament_eval.tournament_evaluator import evaluate
 from lm_tournament_eval.utils import simple_parse_args_string
 
@@ -76,7 +78,7 @@ class Tournament:
     def tournament_evaluate(
         self,
         model: str,
-        lm: HFLM,
+        lm: LM,
         requests: Dict,
         eval_tasks: List,
         task_dict: Dict,
@@ -183,15 +185,17 @@ class Tournament:
         return results
 
     def run_tournament(self):
-        model0 = load_model("hf", 
-                            self.config.model0_name,
+        model0_type, model0_name = parse_model_name(self.config.model0_name)
+        model0 = load_model(model0_type, 
+                            model0_name,
                             self.config.model0_args,
                             batch_size=self.config.batch_size,
                             max_batch_size=self.config.batch_size,
-                            device=self.config.device)
-
-        model1 = load_model("hf",
-                            self.config.model1_name,
+                            device=self.config.device)        
+                            
+        model1_type, model1_name = parse_model_name(self.config.model1_name)
+        model1 = load_model(model1_type,
+                            model1_name,
                             self.config.model1_args,
                             batch_size=self.config.batch_size,
                             max_batch_size=self.config.batch_size,
