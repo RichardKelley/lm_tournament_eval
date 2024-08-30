@@ -14,6 +14,8 @@ from lm_tournament_eval.tasks import TaskManager
 from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
 from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler, DefaultScheduler
 
+from lm_tournament_eval.score_database import ScoreDatabase
+
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
@@ -62,6 +64,9 @@ def setup_parser() -> argparse.ArgumentParser:
                         help="Path to a file containing a CSV of match indices.")
     parser.add_argument("--sampling_schedule", type=bool, default=None,
                         help="Triggers sampling with replacement.")
+    
+    parser.add_argument("--db_path", type=str, default=None,
+                        help="Path to sqlite3 database file.")
 
     return parser
 
@@ -139,6 +144,9 @@ def run_tournament():
         datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
 
         args.model_args = args.model_args + ",trust_remote_code=True"
+
+    if args.db_path is not None:
+        db = ScoreDatabase(args.db_path)
 
     logging.info(f"Selected Tasks: {task_names}")
 
@@ -239,7 +247,10 @@ def run_tournament():
             args.verbosity, 
             initial_elos,
             args.elo_csv_out,
-            scheduler)
+            scheduler,
+            db=db)
+
+        db.record_tournament(tournament)
 
         tournament.run_tournament()
 

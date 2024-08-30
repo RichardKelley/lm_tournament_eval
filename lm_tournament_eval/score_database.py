@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS TOURNAMENT (
     numpy_random_seed INTEGER NOT NULL,
     torch_random_seed INTEGER NOT NULL,
     limit_value INTEGER,
-    filter_value TEXT NOT NULL DEFAULT 'none',
+    filter_value TEXT NOT NULL DEFAULT '[none]',
     num_rounds INTEGER NOT NULL DEFAULT 1,
     batch_size INTEGER NOT NULL DEFAULT 1,
     gen_kwargs TEXT,
@@ -140,9 +140,10 @@ class ScoreDatabase:
     def record_tournament(self, t):
         logging.info("Recording tournament.")
         try:
+            logging.info(f"cmd_filter: {t.config.cmd_filter}")
             self.cursor.execute(_INSERT_TOURNAMENT,
                                 (t.config.name, t.config.random_seed, t.config.numpy_random_seed, 
-                                t.config.torch_random_seed, t.config.limit, t.config.cmd_filter, t.config.rounds, 
+                                t.config.torch_random_seed, t.config.limit, str(t.config.cmd_filter), t.config.rounds, 
                                 t.config.batch_size, t.config.gen_kwargs, t.config.match_size)
                             )
             self.database.commit()
@@ -185,11 +186,40 @@ class ScoreDatabase:
             self.database.rollback()
             return False
 
-    def get_model_score(self, model_name, quantization):
-        pass
+    def get_model_score(self, name, quantization_level):
+        try:
+            self.cursor.execute("""
+            SELECT score FROM MODEL 
+            WHERE name = ? AND quantization_level = ?
+            """, (name, quantization_level))
+            
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+            return None
 
-    def set_model_score(self, model_name, quantization, model_score):
-        pass
+    def set_model_score(self, name, quantization_level, new_score):
+        try:
+            self.cursor.execute("""
+            UPDATE MODEL 
+            SET score = ? 
+            WHERE name = ? AND quantization_level = ?
+            """, (new_score, name, quantization_level))
+            
+            if self.cursor.rowcount == 0:
+                print(f"Model {name} with quantization level {quantization_level} not found.")
+                return False
+            
+            self.database.commit()
+            print(f"Score updated for model {name} with quantization level {quantization_level}.")
+            return True
+        
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+            self.database.rollback()
+            return False
 
     def get_task_instance_scores(self, task_name, instance_idx):
         pass
