@@ -16,7 +16,7 @@ license = { "text" = "MIT" }
 dependencies = [
     "datasets>=2.0.0",
     "torch>=2.0.0",
-    "hflm>=0.0.6"
+    "hflm>=0.0.7"
 ]
 
 [project.scripts]
