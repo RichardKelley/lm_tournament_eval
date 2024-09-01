@@ -54,12 +54,7 @@ def setup_parser() -> argparse.ArgumentParser:
                         help="File path for first model results.")
     parser.add_argument("--offline_file_1", type=str, default="",
                         help="File path for second model results.")
-    
-    parser.add_argument("--elo_csv_in", type=str, default=None,
-                        help="Path to CSV file with initial ELO scores.")
-    parser.add_argument("--elo_csv_out", type=str, default=None,
-                        help="Path to CSV file to write updated ELO scores.")
-    
+        
     parser.add_argument("--file_schedule", type=str, default=None,
                         help="Path to a file containing a CSV of match indices.")
     parser.add_argument("--sampling_schedule", type=bool, default=None,
@@ -72,7 +67,6 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def run_tournament():
-    # print("Running tournament!")
 
     # handle arguments.
     parser = setup_parser()
@@ -184,21 +178,11 @@ def run_tournament():
     if args.limit is not None:
         scheduler.set_limit(args.limit)
 
-
-    args.tournament_name = "{}-{}-{}".format(datetime.datetime.now(), args.model0, args.model1)
+    formatted_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    args.tournament_name = "{}.{}.{}".format(formatted_date, args.model0, args.model1)
     
     # set up local logger.
     # set up wandb logger.
-
-    initial_elos = {}
-    if args.elo_csv_in is not None:
-        with open(args.elo_csv_in, 'r') as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                model, bpw, elo = row
-                initial_elos.update({(model, bpw): float(elo)})
-
-    logging.info(f"Using initial elo scores {initial_elos}")
 
     if args.offline == True:
         # validate tournament parameters.
@@ -245,8 +229,6 @@ def run_tournament():
             task_names, 
             task_manager, 
             args.verbosity, 
-            initial_elos,
-            args.elo_csv_out,
             scheduler,
             db=db)
 
