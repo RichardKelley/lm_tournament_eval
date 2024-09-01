@@ -7,7 +7,7 @@ def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
 
 class ELO:
-    def __init__(self, model0_key, model1_key, initial_elos=None, elo_out=None):
+    def __init__(self, model0_key, model1_key, initial_elos=None):
 
         if initial_elos is not None:
             self.initial_elos = initial_elos
@@ -15,7 +15,7 @@ class ELO:
             self.model0_bpw = model0_key[1]
             self.model1_name = model1_key[0]
             self.model1_bpw = model1_key[1]
-            self.elo_out = elo_out
+            #self.elo_out = elo_out
             # set the initial scores
             if model0_key in initial_elos.keys():
                 self.score_0 = initial_elos[model0_key]
@@ -48,30 +48,47 @@ class ELO:
             for i in range(0, len(results0["samples"][task_name]), match_size):
                 answers0[task_name] = []
                 answers1[task_name] = []
-                if results0['configs'][task_name]['output_type'] == 'generate_until':
-                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
-                        if result0['exact_match'] == 1.0:
-                            answers0[task_name].append(1)
-                        else:
-                            answers0[task_name].append(0)
-                        if result1['exact_match'] == 1.0:
-                            answers1[task_name].append(1)
-                        else:
-                            answers1[task_name].append(0)
-                else:    
-                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
-                        nll0 = [response[0][0] for response in result0["resps"]]
-                        nll1 = [response[0][0] for response in result1["resps"]]
-                        prediction0 = argmax(nll0)
-                        prediction1 = argmax(nll1)
-                        if prediction0 == result0["target"]:
-                            answers0[task_name].append(1)
-                        else:
-                            answers0[task_name].append(0)
-                        if prediction1 == result1["target"]:
-                            answers1[task_name].append(1)
-                        else:
-                            answers1[task_name].append(0)
+                match results0['configs'][task_name]['output_type']:
+                    case 'generate_until':
+                        for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+                            if result0['exact_match'] == 1.0:
+                                answers0[task_name].append(1)
+                            else:
+                                answers0[task_name].append(0)
+                            if result1['exact_match'] == 1.0:
+                                answers1[task_name].append(1)
+                            else:
+                                answers1[task_name].append(0)
+                    case 'loglikelihood' | "multiple_choice":
+                        for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+                            nll0 = [response[0][0] for response in result0["resps"]]
+                            nll1 = [response[0][0] for response in result1["resps"]]
+                            prediction0 = argmax(nll0)
+                            prediction1 = argmax(nll1)
+                            if prediction0 == result0["target"]:
+                                answers0[task_name].append(1)
+                            else:
+                                answers0[task_name].append(0)
+                            if prediction1 == result1["target"]:
+                                answers1[task_name].append(1)
+                            else:
+                                answers1[task_name].append(0)
+                    case 'loglikelihood_rolling':
+                        # TODO check this logic...
+                        for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+                            nll0 = [response[0] for response in result0["resps"]]
+                            nll1 = [response[0] for response in result1["resps"]]
+                            prediction0 = argmax(nll0)
+                            prediction1 = argmax(nll1)
+                            if prediction0 == result0["target"]:
+                                answers0[task_name].append(1)
+                            else:
+                                answers0[task_name].append(0)
+                            if prediction1 == result1["target"]:
+                                answers1[task_name].append(1)
+                            else:
+                                answers1[task_name].append(0)
+
                 # calculate the wins, losses, and draws
                 as_0 = []
                 as_1 = []
@@ -106,19 +123,6 @@ class ELO:
                 index += 1
                 print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
                 print("----------------------------")
-        
-        if self.elo_out is not None:
-            print(f"elo_out file = {self.elo_out}")
-
-            logging.info(f"Writing new ELO score for {self.model0_name}.")
-            self.initial_elos[(self.model0_name, self.model0_bpw)] = self.score_0
-            logging.info(f"Writing new ELO score for {self.model1_name}.")
-            self.initial_elos[(self.model1_name, self.model1_bpw)] = self.score_1
-
-            with open(self.elo_out, 'w') as f:
-                writer = csv.writer(f, delimiter=',')
-                for (k, bpw), v in self.initial_elos.items():
-                    writer.writerow([k, bpw, v])
 
     def offline_elo_update(self, results0, results1, task_names, task_indices):
         # run match
