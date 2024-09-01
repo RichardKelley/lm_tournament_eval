@@ -1,43 +1,43 @@
 import sqlite3
 import logging
 
+from lm_tournament_eval.api.match import Match
+
 _MODEL_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS MODEL (
-    name TEXT NOT NULL,
+    model_name TEXT NOT NULL,
     quantization_level TEXT NOT NULL,
+    model_args TEXT NOT NULL,
     score REAL NOT NULL DEFAULT 0.0,
-    PRIMARY KEY (name, quantization_level)
+    PRIMARY KEY (model_name, quantization_level, model_args)
 );
 """
 
 _TASK_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS TASK (
-    task_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    dataset_name TEXT NOT NULL UNIQUE,
-    type TEXT CHECK( type IN ('loglikelihood', 'loglikelihood_rolling', 'multiple_choice') ) NOT NULL,
-    num_training_instances INTEGER NOT NULL,
-    num_validation_instances INTEGER NOT NULL,
-    num_test_instances INTEGER NOT NULL
+    task_name TEXT NOT NULL UNIQUE,
+    output_type TEXT CHECK( output_type IN ('loglikelihood', 'loglikelihood_rolling', 'multiple_choice', 'generate_until') ) NOT NULL,
+    num_instances INTEGER NOT NULL,
+    PRIMARY KEY (task_name)
 );
 """
 
 _INSTANCE_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS INSTANCE (
     instance_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id INTEGER NOT NULL,
+    task_name INTEGER NOT NULL,
     index_within_task INTEGER NOT NULL,
     text TEXT NOT NULL,
     target TEXT NOT NULL,
     split TEXT CHECK( split IN ('train', 'validation', 'test') ) NOT NULL,
-    FOREIGN KEY (task_id) REFERENCES TASK(task_id),
-    UNIQUE (task_id, index_within_task)
+    FOREIGN KEY (task_name) REFERENCES TASK(task_name),
+    UNIQUE (task_name, index_within_task)
 );
 """
 
 _TOURNAMENT_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS TOURNAMENT (
-    tournament_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    tournament_name TEXT NOT NULL,
     random_seed INTEGER NOT NULL,
     numpy_random_seed INTEGER NOT NULL,
     torch_random_seed INTEGER NOT NULL,
@@ -46,22 +46,27 @@ CREATE TABLE IF NOT EXISTS TOURNAMENT (
     num_rounds INTEGER NOT NULL DEFAULT 1,
     batch_size INTEGER NOT NULL DEFAULT 1,
     gen_kwargs TEXT,
-    match_size INTEGER NOT NULL DEFAULT 1
+    match_size INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (tournament_name)
 );
 """
 
 _MATCH_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS MATCH (
     match_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    tournament_id INTEGER NOT NULL,
+    tournament_name TEXT NOT NULL,
     model0 TEXT NOT NULL,
+    model0_quantization TEXT NOT NULL,
     model0_args TEXT,
     model1 TEXT NOT NULL,
+    model1_quantization TEST NOT NULL,
     model1_args TEXT,
-    tasks TEXT,
-    FOREIGN KEY (tournament_id) REFERENCES TOURNAMENT(tournament_id),
-    FOREIGN KEY (model0) REFERENCES MODEL(name),
-    FOREIGN KEY (model1) REFERENCES MODEL(name)
+    task TEXT NOT NULL,
+    match_size INT NOT NULL,
+    schedule TEXT NOT NULL,
+    FOREIGN KEY (tournament_name) REFERENCES TOURNAMENT(tournament_name),
+    FOREIGN KEY (model0, model0_quantization, model0_args) REFERENCES MODEL(model_name, quantization_level, model_args),
+    FOREIGN KEY (model1, model1_quantization, model1_args) REFERENCES MODEL(model_name, quantization_level, model_args)
 );
 """
 
@@ -89,11 +94,9 @@ CREATE TABLE IF NOT EXISTS MATCH_RESULT (
 """
 
 _INDEX_DEFS = [
-"CREATE INDEX IF NOT EXISTS idx_task_dataset_name ON TASK(dataset_name);",
-"CREATE INDEX IF NOT EXISTS idx_instance_task ON INSTANCE(task_id);",
+"CREATE INDEX IF NOT EXISTS idx_task_dataset_name ON TASK(task_name);",
 "CREATE INDEX IF NOT EXISTS idx_instance_split ON INSTANCE(split);",
-"CREATE INDEX IF NOT EXISTS idx_tournament_name ON TOURNAMENT(name);",
-"CREATE INDEX IF NOT EXISTS idx_match_tournament ON MATCH(tournament_id);",
+"CREATE INDEX IF NOT EXISTS idx_tournament_name ON TOURNAMENT(tournament_name);",
 "CREATE INDEX IF NOT EXISTS idx_match_models ON MATCH(model0, model1);",
 "CREATE INDEX IF NOT EXISTS idx_match_result_match ON MATCH_RESULT(match_id);",
 "CREATE INDEX IF NOT EXISTS idx_match_result_instance ON MATCH_RESULT(instance_id);"
@@ -101,7 +104,7 @@ _INDEX_DEFS = [
 
 _INSERT_TOURNAMENT = """
 INSERT INTO TOURNAMENT (
-    name, random_seed, numpy_random_seed, torch_random_seed, limit_value,
+    tournament_name, random_seed, numpy_random_seed, torch_random_seed, limit_value,
     filter_value, num_rounds, batch_size, gen_kwargs, match_size
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
@@ -151,12 +154,22 @@ class ScoreDatabase:
             logging.error(f"Error recording tournament: {e}")
             self.database.rollback()
 
-    def check_model_exists(self, model, quantization):
+    def get_tournament(self, t):
         try:
             self.cursor.execute("""
+            
+            """, ())
+        except sqlite3.Error as e:
+            logging.error(f"Error getting tournament: {e}")
+
+    def check_model_exists(self, model, quantization, model_args):
+        try:
+            if model_args is None:
+                model_args = "None"
+            self.cursor.execute("""
             SELECT 1 FROM MODEL 
-            WHERE name = ? AND quantization_level = ?
-            """, (model, quantization))
+            WHERE model_name = ? AND quantization_level = ? AND model_args = ?
+            """, (model, quantization, model_args))
             
             result = self.cursor.fetchone()
             return result is not None
@@ -165,18 +178,21 @@ class ScoreDatabase:
             print(f"An error occurred: {e}")
             return False
         
-    def insert_model(self, model, quantization, score=1200):
+    def insert_model(self, model, quantization, model_args, score=1200):
         try:
+            if model_args is None:
+                model_args = "None"
             self.cursor.execute("""
-            INSERT INTO MODEL (name, quantization_level, score)
-            VALUES (?, ?, ?)
-            """, (model, quantization, score))
+            INSERT INTO MODEL (model_name, quantization_level, model_args, score)
+            VALUES (?, ?, ?, ?)
+            """, (model, quantization, model_args, score))
             
             self.database.commit()
             print(f"Model {model} with quantization level {quantization} inserted successfully.")
             return True
         
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as e:
+            logging.error(f"Integrity error: {e}")
             print(f"Model {model} with quantization level {quantization} already exists.")
             self.database.rollback()
             return False
@@ -186,12 +202,12 @@ class ScoreDatabase:
             self.database.rollback()
             return False
 
-    def get_model_score(self, name, quantization_level):
+    def get_model_score(self, name, quantization_level, model_args):
         try:
             self.cursor.execute("""
             SELECT score FROM MODEL 
-            WHERE name = ? AND quantization_level = ?
-            """, (name, quantization_level))
+            WHERE model_name = ? AND quantization_level = ? AND model_args = ?
+            """, (name, quantization_level, model_args))
             
             result = self.cursor.fetchone()
             return result[0] if result else None
@@ -200,13 +216,13 @@ class ScoreDatabase:
             print(f"An error occurred: {e}")
             return None
 
-    def set_model_score(self, name, quantization_level, new_score):
+    def set_model_score(self, name, quantization_level, model_args, new_score):
         try:
             self.cursor.execute("""
             UPDATE MODEL 
             SET score = ? 
-            WHERE name = ? AND quantization_level = ?
-            """, (new_score, name, quantization_level))
+            WHERE model_name = ? AND quantization_level = ? AND model_args = ?
+            """, (new_score, name, quantization_level, model_args))
             
             if self.cursor.rowcount == 0:
                 print(f"Model {name} with quantization level {quantization_level} not found.")
@@ -220,6 +236,62 @@ class ScoreDatabase:
             print(f"An error occurred: {e}")
             self.database.rollback()
             return False
+
+    def task_exists(self, task_name):
+        """
+        Check if a task exists in the database.
+        
+        :param conn: SQLite database connection
+        :param task_name: Name of the task to check
+        :return: True if the task exists, False otherwise
+        """        
+        self.cursor.execute("SELECT 1 FROM TASK WHERE task_name = ?", (task_name,))
+        return self.cursor.fetchone() is not None
+    
+
+    def insert_task(self, task_name, output_type, num_instances):
+        try:
+            self.cursor.execute("""
+                INSERT INTO TASK (task_name, output_type, num_instances)
+                VALUES (?, ?, ?)
+            """, (task_name, output_type, num_instances))
+            self.database.commit()
+            return True
+        except sqlite3.IntegrityError:
+            self.database.rollback()
+            return False
+
+    def match_exists(self, m : Match):
+        tournament_name = m.tournament_name
+        model0_key = m.model0_key
+        model1_key = m.model1_key
+
+        query = """
+        SELECT 1 FROM MATCH 
+        WHERE tournament_name = ? AND model0 = ? AND model0_quantization = ? AND model0_args = ? AND model1 = ? AND model1_quantization = ? AND model1_args = ?
+        """
+        params = [tournament_name, *model0_key, *model1_key]
+
+        self.cursor.execute(query, params)
+        return self.cursor.fetchone() is not None
+
+    def insert_match(self, m : Match):
+        tournament_name = m.tournament_name
+        model0_key = m.model0_key
+        model1_key = m.model1_key
+        task = m.task
+        match_size = m.match_size
+        schedule = m.schedule
+        try:
+            self.cursor.execute("""
+                INSERT INTO MATCH (tournament_name, model0, model0_quantization, model0_args, model1, model1_quantization, model1_args, task, match_size, schedule)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (tournament_name, *model0_key, *model1_key, task, match_size, str(schedule)))
+            self.database.commit()
+            return self.cursor.lastrowid
+        except sqlite3.IntegrityError:
+            self.database.rollback()
+            return None
 
     def get_task_instance_scores(self, task_name, instance_idx):
         pass
