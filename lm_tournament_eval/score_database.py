@@ -70,13 +70,22 @@ CREATE TABLE IF NOT EXISTS MATCH (
 );
 """
 
+_MATCH_SCHEDULE_DEF = """
+CREATE TABLE IF NOT EXISTS MATCH_SCHEDULE (
+    match_id INTEGER NOT NULL,
+    schedule_index INTEGER NOT NULL,
+    PRIMARY KEY (match_id, schedule_index)
+    FOREIGN KEY (match_id) REFERENCES MATCH(match_id)
+);
+"""
+
 _MATCH_TASK_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS MATCH_TASK (
     match_id INTEGER NOT NULL,
-    task_id INTEGER NOT NULL,
-    PRIMARY KEY (match_id, task_id),
+    task_name TEXT NOT NULL,
+    PRIMARY KEY (match_id, task_name),
     FOREIGN KEY (match_id) REFERENCES MATCH(match_id),
-    FOREIGN KEY (task_id) REFERENCES TASK(task_id)
+    FOREIGN KEY (task_name) REFERENCES TASK(task_name)
 );
 """
 
@@ -126,6 +135,7 @@ def _initialize_database(cursor):
     cursor.execute(_MATCH_TABLE_DEF)
     cursor.execute(_MATCH_TASK_TABLE_DEF)
     cursor.execute(_MATCH_RESULT_TABLE_DEF)
+    cursor.execute(_MATCH_SCHEDULE_DEF)
 
     # create indexes
     cursor.execute("BEGIN TRANSACTION")
@@ -275,6 +285,18 @@ class ScoreDatabase:
         self.cursor.execute(query, params)
         return self.cursor.fetchone() is not None
 
+    def insert_match_schedule(self, match_id, schedule_index):
+        try:
+            self.cursor.execute("""
+                INSERT INTO MATCH_SCHEDULE (match_id, schedule_index) VALUES (?, ?)
+            """, (match_id, schedule_index))
+            self.database.commit()
+
+            return self.cursor.lastrowid
+        except sqlite3.IntegrityError:
+            self.database.rollback()
+            return None
+
     def insert_match(self, m : Match):
         tournament_name = m.tournament_name
         model0_key = m.model0_key
@@ -288,7 +310,13 @@ class ScoreDatabase:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (tournament_name, *model0_key, *model1_key, task, match_size, str(schedule)))
             self.database.commit()
-            return self.cursor.lastrowid
+            id = self.cursor.lastrowid
+
+            for index in m.schedule:
+                self.insert_match_schedule(id, index)
+
+            return id
+            #return self.cursor.lastrowid
         except sqlite3.IntegrityError:
             self.database.rollback()
             return None
