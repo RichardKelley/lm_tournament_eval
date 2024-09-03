@@ -88,12 +88,6 @@ class ELO:
             as_1 = []
             winners = []
 
-            score_diff_0 = min(max(self.score_0 - self.score_1, -MAX_SCORE_DIFF), MAX_SCORE_DIFF)
-            expected_score_0 = 1 / (1 + 10**(score_diff_0 / 400))
-
-            score_diff_1 = min(max(self.score_1 - self.score_0, -MAX_SCORE_DIFF), MAX_SCORE_DIFF)
-            expected_score_1 = 1 / (1 + 10**(score_diff_1 / 400))
-
             for i in range(len(answers0)):
                 # draw
                 if answers0[i] == answers1[i]:
@@ -116,9 +110,12 @@ class ELO:
                                             elo_0=model0_old_elo,
                                             elo_1=model1_old_elo,
                                             winners=winners)
+            
+            score_diff_0 = min(max(self.score_0 - self.score_1, -MAX_SCORE_DIFF), MAX_SCORE_DIFF)
+            expected_score_0 = 1 / (1 + 10**(score_diff_0 / 400))
 
-            expected_score_0 = 1/(1+10**((self.score_0-self.score_1)/400))
-            expected_score_1 = 1/(1+10**((self.score_1-self.score_0)/400))
+            score_diff_1 = min(max(self.score_1 - self.score_0, -MAX_SCORE_DIFF), MAX_SCORE_DIFF)
+            expected_score_1 = 1 / (1 + 10**(score_diff_1 / 400))            
 
             # update Elo
             if sum(as_0) > sum(as_1):
