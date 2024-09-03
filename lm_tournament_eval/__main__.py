@@ -163,13 +163,6 @@ def run_tournament():
         scheduler = FileScheduler(args.file_schedule)
     elif args.sampling_schedule is not None and args.sampling_schedule:
 
-        if args.match_size is None:
-            logging.error("args.match_size cannot be None if args.sampling_schedule is True.")
-
-        if args.num_rounds is None:
-            logging.error("args.num_rounds cannot be None if args.sampling_schedule is True")
-            sys.exit(1)
-
         logging.info("Using {args.match_size} for sample size.")
         scheduler = SamplingScheduler(rounds=args.num_rounds, match_size=args.match_size)
     else:

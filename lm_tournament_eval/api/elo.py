@@ -7,6 +7,7 @@ from lm_tournament_eval.api.match import Match
 
 def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
+MAX_SCORE_DIFF = 800
 
 MAX_SCORE_DIFF = 800
 
@@ -151,8 +152,12 @@ class ELO:
             # model 2 won
             elif results0[i]['acc'] < results1[i]['acc']:
                 as_2.append(1)
-        expected_score_0 = 1/(1+10**((self.score_0-self.score_1)/400))
-        expected_score_1 = 1/(1+10**((self.score_1-self.score_0)/400))
+
+        score_diff_0 = min(max(self.score_0 - self.score_1, -MAX_SCORE_DIFF), MAX_SCORE_DIFF)
+        expected_score_0 = 1 / (1 + 10**(score_diff_0 / 400))
+
+        score_diff_1 = min(max(self.score_1 - self.score_0, -MAX_SCORE_DIFF), MAX_SCORE_DIFF)
+        expected_score_1 = 1 / (1 + 10**(score_diff_1 / 400))
         
         # update Elo
         if sum(as_1) > sum(as_2):
