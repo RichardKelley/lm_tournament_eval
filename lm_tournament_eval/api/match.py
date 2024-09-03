@@ -29,66 +29,36 @@ class MatchResult:
     # )
 
 @dataclass
-class MultipleChoiceDocument:
-    ind : int
-    activity_label: str
-    ctx: str
-    endings : List[str]
-    split : str
-    gold : int
-
-    def __repr__(self):
-        return f"""{{   
-            'ind' : {self.ind},
-            'activity_label' : {self.activity_label},
-            'ctx' : {self.ctx},
-            'endings' : {self.endings},
-            'split' : {self.split},
-            'gold' : {self.gold}
-        }}"""
-    
-@dataclass
-class GenerateUntilDocument:
-    question: str
-    answer: str
-
-    def __repr__(self):
-        return f"""{{
-          'question' : {self.question},
-          'answer' : {self.answer}
-        }}"""
+class InstanceRecord:
+    task_name : str
+    doc_id: int
+    doc_hash : str
+    prompt_hash : str
+    target_hash : str
 
 @dataclass
-class LoglikelihoodRollingDocument:
-    text: str
+class InstanceUpdate:
+    match_id : int
 
-    def __repr__(self):
-        return f"""{{
-          'str' : {self.str}
-        }}"""
+    # foreign key for instance
+    task_name : str
+    doc_id : int
 
-class InstanceResult:
-    def __init__(self,
-                 doc_id : int,
-                 doc : Union[MultipleChoiceDocument, GenerateUntilDocument, LoglikelihoodRollingDocument],
-                 target : Union[str, int],
-                 arguments : List[Tuple],
-                 resps : List,
-                 filtered_resps : List,
-                 doc_hash : str,
-                 prompt_hash : str,
-                 target_hash : str
-                 ) -> None:
-        self.doc_id = doc_id
-        self.doc = doc
-        self.target = target
-        self.arguments = arguments
-        self.resps = resps
-        self.filtered_resps = filtered_resps
-        self.doc_hash = doc_hash
-        self.prompt_hash = prompt_hash
-        self.target_hash = target_hash
+    # foreign key for models
+    model0_name : str
+    model0_quantization : int
+    model0_args : str
 
+    model1_name : str
+    model1_quantization : int
+    model1_args : str
+
+    # elo of models at time of evaluation
+    model0_elo : float
+    model1_elo : float
+
+    # One of [model0, model1, draw]
+    winner : str
 
 class Match:
 
