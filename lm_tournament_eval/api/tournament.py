@@ -112,10 +112,7 @@ class Tournament:
 
         self.elo = ELO(self.model0_key, 
                        self.model1_key, 
-                       {
-                        self.model0_key : elo_0, 
-                        self.model1_key : elo_1
-                       }
+                       self.db
                     )
 
     def tournament_evaluate(
@@ -308,23 +305,16 @@ class Tournament:
                 match_dict0 = results0['configs'][task_name]
                 match_dict1 = results1['configs'][task_name]
                 m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
-                self.db.insert_match(m)
+                match_id = self.db.insert_match(m)
+
+                self.db.update_instance_records(m, 
+                                                results0["samples"][task_name], 
+                                                results1["samples"][task_name])
 
                 rounds_per_task = []
                 match_results = {}
                 if model0._rank == 0:
-                    for i, task_name in enumerate([subtask.task_name]):
-                        rounds_per_task.append(len(results0["samples"][task_name])//self.scheduler.match_size)
-                        match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
-                                                                model1_name=self.config.model1_name,
-                                                                model0_old_elo=self.elo.score_0,
-                                                                model0_new_elo=self.elo.score_0,
-                                                                model1_old_elo=self.elo.score_1,
-                                                                model1_new_elo=self.elo.score_1)
-                                                                for i in range(rounds_per_task[i])]
-
-                    #calculate ELO updates
-                    self.elo.online_elo_update(results0, results1, [subtask.task_name], self.scheduler.match_size, match_results)
+                    self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
 
                     self.db.set_model_score(*self.model0_key, self.elo.score_0)
                     self.db.set_model_score(*self.model1_key, self.elo.score_1)
