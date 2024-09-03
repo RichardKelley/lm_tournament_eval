@@ -72,86 +72,8 @@ def run_tournament():
     parser = setup_parser()
     args = parser.parse_args()
 
-    if args.include_path is not None:
-        logging.info(f"Including path: {args.include_path}")
-    task_manager = TaskManager(args.verbosity, include_path=args.include_path)
-
-    if args.tasks is None:
-        logging.error("Need to specify a task to evaluate.")    
-        sys.exit()
-    elif args.tasks == "list":
-        print(task_manager.list_all_tasks())
-        sys.exit()
-    elif args.tasks == "list_groups":
-        print(task_manager.list_all_tasks(list_subtasks=False, list_tags=False))
-        sys.exit()
-    elif args.tasks == "list_tags":
-        print(task_manager.list_all_tasks(list_groups=False, list_subtasks=False))
-        sys.exit()
-    elif args.tasks == "list_subtasks":
-        print(task_manager.list_all_tasks(list_groups=False, list_tags=False))
-        sys.exit()
-    else:
-        if os.path.isdir(args.tasks):
-            import glob
-
-            task_names = []
-            yaml_path = os.path.join(args.tasks, "*.yaml")
-            for yaml_file in glob.glob(yaml_path):
-                config = utils.load_yaml_config(yaml_file)
-                task_names.append(config)
-        else:
-            task_list = args.tasks.split(",")
-            task_names = task_manager.match_tasks(task_list)
-
-            if set(task_list) == set(task_names):
-                task_names = task_list
-
-            for task in [task for task in task_list if task not in task_names]:
-                if os.path.isfile(task):
-                    config = utils.load_yaml_config(task)
-                    task_names.append(config)
-            task_missing = [
-                task for task in task_list if task not in task_names and "*" not in task
-            ]  # we don't want errors if a wildcard ("*") task name was used
-
-            if task_missing:
-                missing = ", ".join(task_missing)
-                logging.error(
-                    f"Tasks were not found: {missing}\n"
-                    f"{utils.SPACING}Try `lm-eval --tasks list` for list of available tasks",
-                )
-                raise ValueError(
-                    f"Tasks not found: {missing}. Try `lm-eval --tasks {{list_groups,list_subtasks,list_tags,list}}` to list out all available names for task groupings; only (sub)tasks; tags; or all of the above, or pass '--verbosity DEBUG' to troubleshoot task registration issues."
-                )
-
-    # Respect user's value passed in via CLI, otherwise default to True and add to comma-separated model args
-    if args.trust_remote_code:
-        logging.info(
-            "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
-        )
-        # HACK: import datasets and override its HF_DATASETS_TRUST_REMOTE_CODE value internally,
-        # because it's already been determined based on the prior env var before launching our
-        # script--`datasets` gets imported by lm_eval internally before these lines can update the env.
-        import datasets
-
-        datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
-
-        args.model_args = args.model_args + ",trust_remote_code=True"
-
     if args.db_path is not None:
         db = ScoreDatabase(args.db_path)
-
-    logging.info(f"Selected Tasks: {task_names}")
-
-    if ',' in args.filter:
-        filter_list = args.filter.split(',')
-        if len(filter_list) != len(task_names):
-            raise ValueError(
-                f"Filter list length {len(filter_list)} does not match task list length {len(task_list)}. Provide one filter per task."
-            )
-    else:
-        filter_list = [args.filter]
 
     # set up scheduler
     if args.file_schedule is not None and args.sampling_schedule is not None:
@@ -168,9 +90,6 @@ def run_tournament():
     else:
         scheduler = DefaultScheduler(rounds=args.num_rounds, match_size=args.match_size)
 
-    if args.limit is not None:
-        scheduler.set_limit(args.limit)
-
     formatted_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     args.tournament_name = "{}.{}.{}".format(formatted_date, args.model0, args.model1)
     
@@ -181,8 +100,10 @@ def run_tournament():
         # validate tournament parameters.
         task_config = TaskConfig()
         cfg = OfflineTournamentConfig(name=args.tournament_name,
-                                      offline_file_0=args.offline_file_0,
-                                      offline_file_1=args.offline_file_1,
+                                      offline_results_file_0=args.offline_results_file_0,
+                                      offline_sample_file_0=args.offline_sample_file_0,
+                                      offline_results_file_1=args.offline_results_file_1,
+                                      offline_sample_file_1=args.offline_sample_file_1,
                                       task_name=args.tasks,
                                       rounds=args.num_rounds,
                                       num_samples=args.match_size,
@@ -196,6 +117,88 @@ def run_tournament():
         # run tournament evaluator.
         result = tournament.run_tournament()    
     else:
+        if args.include_path is not None:
+            logging.info(f"Including path: {args.include_path}")
+        task_manager = TaskManager(args.verbosity, include_path=args.include_path)
+
+        if args.tasks is None:
+            logging.error("Need to specify a task to evaluate.")    
+            sys.exit()
+        elif args.tasks == "list":
+            print(task_manager.list_all_tasks())
+            sys.exit()
+        elif args.tasks == "list_groups":
+            print(task_manager.list_all_tasks(list_subtasks=False, list_tags=False))
+            sys.exit()
+        elif args.tasks == "list_tags":
+            print(task_manager.list_all_tasks(list_groups=False, list_subtasks=False))
+            sys.exit()
+        elif args.tasks == "list_subtasks":
+            print(task_manager.list_all_tasks(list_groups=False, list_tags=False))
+            sys.exit()
+        else:
+            if os.path.isdir(args.tasks):
+                import glob
+
+                task_names = []
+                yaml_path = os.path.join(args.tasks, "*.yaml")
+                for yaml_file in glob.glob(yaml_path):
+                    config = utils.load_yaml_config(yaml_file)
+                    task_names.append(config)
+            else:
+                task_list = args.tasks.split(",")
+                task_names = task_manager.match_tasks(task_list)
+
+                if set(task_list) == set(task_names):
+                    task_names = task_list
+
+                for task in [task for task in task_list if task not in task_names]:
+                    if os.path.isfile(task):
+                        config = utils.load_yaml_config(task)
+                        task_names.append(config)
+                task_missing = [
+                    task for task in task_list if task not in task_names and "*" not in task
+                ]  # we don't want errors if a wildcard ("*") task name was used
+
+                if task_missing:
+                    missing = ", ".join(task_missing)
+                    logging.error(
+                        f"Tasks were not found: {missing}\n"
+                        f"{utils.SPACING}Try `lm-eval --tasks list` for list of available tasks",
+                    )
+                    raise ValueError(
+                        f"Tasks not found: {missing}. Try `lm-eval --tasks {{list_groups,list_subtasks,list_tags,list}}` to list out all available names for task groupings; only (sub)tasks; tags; or all of the above, or pass '--verbosity DEBUG' to troubleshoot task registration issues."
+                    )
+
+        # Respect user's value passed in via CLI, otherwise default to True and add to comma-separated model args
+        if args.trust_remote_code:
+            logging.info(
+                "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
+            )
+            # HACK: import datasets and override its HF_DATASETS_TRUST_REMOTE_CODE value internally,
+            # because it's already been determined based on the prior env var before launching our
+            # script--`datasets` gets imported by lm_eval internally before these lines can update the env.
+            import datasets
+
+            datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
+
+            args.model_args = args.model_args + ",trust_remote_code=True"
+
+        if args.limit is not None:
+            scheduler.set_limit(args.limit)
+
+
+        logging.info(f"Selected Tasks: {task_names}")
+
+        if ',' in args.filter:
+            filter_list = args.filter.split(',')
+            if len(filter_list) != len(task_names):
+                raise ValueError(
+                    f"Filter list length {len(filter_list)} does not match task list length {len(task_list)}. Provide one filter per task."
+                )
+        else:
+            filter_list = [args.filter]
+
         # validate tournament parameters.
         cfg = TournamentConfig(name=args.tournament_name,
                               rounds=args.num_rounds,

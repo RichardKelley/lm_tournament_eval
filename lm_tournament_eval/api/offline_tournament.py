@@ -7,13 +7,17 @@ from .match import MatchResult, Match
 import json
 import numpy as np
 from lm_tournament_eval.api.elo import ELO
+from lm_tournament_eval.score_database import ScoreDatabase
+import logging
 
 
 @dataclass
 class OfflineTournamentConfig:
     name : str
-    offline_file_0 : str
-    offline_file_1 : str
+    offline_results_file_0 : str
+    offline_sample_file_0 : str
+    offline_results_file_1 : str
+    offline_sample_file_1 : str
     task_name : str
     rounds : int
     num_samples : int
@@ -23,29 +27,65 @@ class OfflineTournamentConfig:
 
 
 class OfflineTournament:
-    def __init__(self, config : OfflineTournamentConfig):
+    def __init__(self, config : OfflineTournamentConfig,
+                 scheduler = None,
+                 db: ScoreDatabase = None):
         self.config = config
-        self.elo = ELO()
         # read the offline results in 
         self.responses_0 = []
         self.responses_1 = []
-        with open(config.offline_file_0, 'r') as file:
+        with open(config.offline_results_file_0) as json_file:
+            self.results_0 = json.load(json_file)
+        with open(config.offline_results_file_1) as json_file:
+            self.results_1 = json.load(json_file)
+        with open(config.offline_sample_file_0, 'r') as file:
             for line in file:
                 self.responses_0.append(json.loads(line))
-        with open(config.offline_file_1, 'r') as file:
+        with open(config.offline_sample_file_1, 'r') as file:
             for line in file:
                 self.responses_1.append(json.loads(line))
 
         self.scheduler_cfg = OfflineMatchSchedulerConfig(rounds = config.rounds,
                                                          num_samples = config.num_samples)
         self.scheduler = OfflineMatchScheduler(self.scheduler_cfg)
-        self.match_result_list = [MatchResult(model0_name=self.config.model0_name,
-                                              model1_name=self.config.model1_name,           
-                                              model0_old_elo=self.elo.score_0,
-                                              model1_old_elo=self.elo.score_1,
-                                              model0_new_elo=self.elo.score_0,
-                                              model1_new_elo=self.elo.score_1)
-                                              for i in range(self.config.rounds)]
+
+
+        model0_bpw = '16'
+        if self.results_0["config"]["model_args"] is not None:
+            if "load_in_4bit" in self.results_0["config"]["model_args"]:
+                model0_bpw = '4'
+            elif "load_in_8bit" in self.results_0["config"]["model_args"]:
+                model0_bpw = '8'
+               
+        model1_bpw = '16'
+        if self.results_1["config"]["model_args"] is not None:
+            if "load_in_4bit" in self.results_1["config"]["model_args"]:
+                model1_bpw = '4'
+            if "load_in_8bit" in self.results_1["config"]["model_args"]:
+                model1_bpw = '8'
+
+        self.model0_key = (
+            config.model0_name, 
+            model0_bpw, 
+            self.results_0["config"]["model_args"] if self.results_0["config"]["model_args"] is not None else 'None'
+        )
+        self.model1_key = (
+            config.model1_name, 
+            model1_bpw, 
+            self.results_1["config"]["model_args"] if self.results_1["config"]["model_args"] is not None else 'None'
+        )
+
+        if not db.check_model_exists(*self.model0_key):
+            logging.info("Inserting model0 into DB")
+            self.db.insert_model(*self.model0_key)
+
+        if not db.check_model_exists(*self.model1_key):
+            self.db.insert_model(*self.model1_key)
+
+        self.elo = ELO(self.model0_key, 
+                       self.model1_key, 
+                       self.db
+                    )
 
     def run_tournament(self):
         for n in range(self.config.rounds):

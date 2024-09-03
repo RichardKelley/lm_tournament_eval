@@ -107,9 +107,6 @@ class Tournament:
         if not db.check_model_exists(*self.model1_key):
             self.db.insert_model(*self.model1_key)
 
-        elo_0 = db.get_model_score(*self.model0_key)
-        elo_1 = db.get_model_score(*self.model1_key)
-
         self.elo = ELO(self.model0_key, 
                        self.model1_key, 
                        self.db
@@ -311,8 +308,6 @@ class Tournament:
                                                 results0["samples"][task_name], 
                                                 results1["samples"][task_name])
 
-                rounds_per_task = []
-                match_results = {}
                 if model0._rank == 0:
                     self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
 
