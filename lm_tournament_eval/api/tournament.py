@@ -24,6 +24,8 @@ from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
 from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
 from lm_tournament_eval.api.task import Task
+from lm_tournament_eval.score_database import ScoreDatabase
+from lm_tournament_eval.api.match import Match
 
 from lm_tournament_eval.loggers.utils import (
      add_env_info, 
@@ -54,13 +56,19 @@ class TournamentConfig:
     fewshot_random_seed : int
 
 class Tournament:
-    def __init__(self, config : TournamentConfig, tasks, task_manager, verbosity, initial_elos=None, elo_out=None, scheduler = None):
+    def __init__(self, 
+                 config : TournamentConfig, 
+                 tasks, 
+                 task_manager, 
+                 verbosity, 
+                 scheduler = None, 
+                 db : ScoreDatabase = None):
         self.config = config
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
-        self.elo_out = elo_out
         self.scheduler = scheduler
+        self.db = db
 
         # get model0_key
         model0_bpw = '16'
@@ -79,10 +87,33 @@ class Tournament:
             if "load_in_8bit" in config.model1_args:
                 model1_bpw = '8'
 
-        model0_key = (config.model0_name, model0_bpw)
-        model1_key = (config.model1_name, model1_bpw)
+        self.model0_key = (
+            config.model0_name, 
+            model0_bpw, 
+            config.model0_args if config.model0_args is not None else 'None'
+        )
+        self.model1_key = (
+            config.model1_name, 
+            model1_bpw, 
+            config.model1_args if config.model1_args is not None else 'None'
+        )
 
-        self.elo = ELO(model0_key, model1_key, initial_elos, elo_out)
+        logging.info(f"model0 key = {self.model0_key}")
+
+        if not db.check_model_exists(*self.model0_key):
+            logging.info("Inserting model0 into DB")
+            self.db.insert_model(*self.model0_key)
+
+        if not db.check_model_exists(*self.model1_key):
+            self.db.insert_model(*self.model1_key)
+
+        elo_0 = db.get_model_score(*self.model0_key)
+        elo_1 = db.get_model_score(*self.model1_key)
+
+        self.elo = ELO(self.model0_key, 
+                       self.model1_key, 
+                       self.db
+                    )
 
     def tournament_evaluate(
         self,
@@ -223,6 +254,12 @@ class Tournament:
 
             self.scheduler.set_task_size(len(task_dict[task_name].eval_docs))
 
+            if not self.db.task_exists(task_name):
+                task = task_dict[task_name]
+                self.db.insert_task(task_name=task_name, 
+                                    output_type=task.config.output_type, 
+                                    num_instances=len(task.eval_docs))
+
             original_task = deepcopy(task_dict[task_name])
 
             for match_schedule in self.scheduler:
@@ -247,7 +284,7 @@ class Tournament:
                                                     device=self.config.device,
                                                     limit=self.config.limit
                                                 )
-                        
+                
                 requests1, padding_reqests1 = create_requests(model1,
                                                               task=subtask,
                                                               limit=self.config.limit)
@@ -264,18 +301,20 @@ class Tournament:
                                                     device=self.config.device,
                                                     limit=self.config.limit
                                                 )
+                
+                match_dict0 = results0['configs'][task_name]
+                match_dict1 = results1['configs'][task_name]
+                m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
+                match_id = self.db.insert_match(m)
+
+                self.db.update_instance_records(m, 
+                                                results0["samples"][task_name], 
+                                                results1["samples"][task_name])
 
                 rounds_per_task = []
                 match_results = {}
                 if model0._rank == 0:
-                    for i, task_name in enumerate([subtask.task_name]):
-                        rounds_per_task.append(len(results0["samples"][task_name])//self.scheduler.match_size)
-                        match_results[task_name] = [MatchResult(model0_name=self.config.model0_name,
-                                                                model1_name=self.config.model1_name,
-                                                                model0_old_elo=self.elo.score_0,
-                                                                model0_new_elo=self.elo.score_0,
-                                                                model1_old_elo=self.elo.score_1,
-                                                                model1_new_elo=self.elo.score_1)
-                                                                for i in range(rounds_per_task[i])]
-                    #calculate ELO updates
-                    self.elo.online_elo_update(results0, results1, [subtask.task_name], self.scheduler.match_size, match_results)
+                    self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
+
+                    self.db.set_model_score(*self.model0_key, self.elo.score_0)
+                    self.db.set_model_score(*self.model1_key, self.elo.score_1)
