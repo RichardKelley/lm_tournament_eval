@@ -46,11 +46,11 @@ class ELO:
                         if result0['exact_match'] == 1.0:
                             answers0.append(1)
                         else:
-                            answers0[m.task].append(0)
+                            answers0.append(0)
                         if result1['exact_match'] == 1.0:
                             answers1.append(1)
                         else:
-                            answers1[m.task].append(0)
+                            answers1.append(0)
                 case 'loglikelihood' | "multiple_choice":
                     for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
                         nll0 = [response[0][0] for response in result0["resps"]]
