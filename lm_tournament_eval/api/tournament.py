@@ -5,6 +5,7 @@ import time
 import random
 import numpy as np
 import torch
+import gc
 
 from hflm import LM
 
@@ -223,22 +224,6 @@ class Tournament:
 
         if seed_message:
             logging.info(" | ".join(seed_message))
-        
-        model0_type, model0_name = parse_model_name(self.config.model0_name)
-        model0 = load_model(model0_type, 
-                            model0_name,
-                            self.config.model0_args,
-                            batch_size=self.config.batch_size,
-                            max_batch_size=self.config.batch_size,
-                            device=self.config.device)        
-                            
-        model1_type, model1_name = parse_model_name(self.config.model1_name)
-        model1 = load_model(model1_type,
-                            model1_name,
-                            self.config.model1_args,
-                            batch_size=self.config.batch_size,
-                            max_batch_size=self.config.batch_size,
-                            device=self.config.device)
 
         for task_name in self.tasks:
             logging.info(f"Current task: {task_name}")
@@ -261,13 +246,21 @@ class Tournament:
                                     num_instances=len(task.eval_docs))
 
             original_task = deepcopy(task_dict[task_name])
-
+            rank = 0
             for match_schedule in self.scheduler:
                 logging.info(f"Current match indices: {match_schedule}")
 
                 subtask = create_subtask(original_task, schedule=match_schedule)
                 
+                model0_type, model0_name = parse_model_name(self.config.model0_name)
+                model0 = load_model(model0_type, 
+                                    model0_name,
+                                    self.config.model0_args,
+                                    batch_size=self.config.batch_size,
+                                    max_batch_size=self.config.batch_size,
+                                    device=self.config.device)        
 
+                rank = model0._rank
                 requests0, padding_reqests0 = create_requests(model0, 
                                                               task=subtask,
                                                               limit=self.config.limit)
@@ -284,7 +277,18 @@ class Tournament:
                                                     device=self.config.device,
                                                     limit=self.config.limit
                                                 )
-                
+                del model0
+                torch.cuda.empty_cache()
+                gc.collect()
+
+                model1_type, model1_name = parse_model_name(self.config.model1_name)
+                model1 = load_model(model1_type,
+                                    model1_name,
+                                    self.config.model1_args,
+                                    batch_size=self.config.batch_size,
+                                    max_batch_size=self.config.batch_size,
+                                    device=self.config.device)
+
                 requests1, padding_reqests1 = create_requests(model1,
                                                               task=subtask,
                                                               limit=self.config.limit)
@@ -301,7 +305,10 @@ class Tournament:
                                                     device=self.config.device,
                                                     limit=self.config.limit
                                                 )
-                
+                del model1
+                torch.cuda.empty_cache()
+                gc.collect()
+
                 match_dict0 = results0['configs'][task_name]
                 match_dict1 = results1['configs'][task_name]
                 m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
@@ -313,7 +320,7 @@ class Tournament:
 
                 rounds_per_task = []
                 match_results = {}
-                if model0._rank == 0:
+                if rank == 0:
                     self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
 
                     self.db.set_model_score(*self.model0_key, self.elo.score_0)
