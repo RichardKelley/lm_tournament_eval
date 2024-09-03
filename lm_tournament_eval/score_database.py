@@ -1,7 +1,13 @@
 import sqlite3
 import logging
 
-from lm_tournament_eval.api.match import Match
+from lm_tournament_eval.api.match import (
+    Match, 
+    InstanceRecord, 
+    InstanceUpdate,
+)
+
+from typing import List
 
 _MODEL_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS MODEL (
@@ -24,14 +30,15 @@ CREATE TABLE IF NOT EXISTS TASK (
 
 _INSTANCE_TABLE_DEF = """
 CREATE TABLE IF NOT EXISTS INSTANCE (
-    instance_id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_name INTEGER NOT NULL,
-    index_within_task INTEGER NOT NULL,
-    text TEXT NOT NULL,
-    target TEXT NOT NULL,
-    split TEXT CHECK( split IN ('train', 'validation', 'test') ) NOT NULL,
+    doc_id INTEGER NOT NULL,
+    doc_hash TEXT NOT NULL,
+    prompt_hash TEXT NOT NULL,
+    target_hash TEXT NOT NULL,
+
+    PRIMARY KEY (task_name, doc_id),
     FOREIGN KEY (task_name) REFERENCES TASK(task_name),
-    UNIQUE (task_name, index_within_task)
+    UNIQUE (task_name, doc_id)
 );
 """
 
@@ -79,36 +86,36 @@ CREATE TABLE IF NOT EXISTS MATCH_SCHEDULE (
 );
 """
 
-_MATCH_TASK_TABLE_DEF = """
-CREATE TABLE IF NOT EXISTS MATCH_TASK (
+_INSTANCE_UPDATE_TABLE_DEF = """
+CREATE TABLE IF NOT EXISTS INSTANCE_UPDATE (
     match_id INTEGER NOT NULL,
-    task_name TEXT NOT NULL,
-    PRIMARY KEY (match_id, task_name),
-    FOREIGN KEY (match_id) REFERENCES MATCH(match_id),
-    FOREIGN KEY (task_name) REFERENCES TASK(task_name)
-);
-"""
 
-_MATCH_RESULT_TABLE_DEF = """
-CREATE TABLE IF NOT EXISTS MATCH_RESULT (
-    result_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    match_id INTEGER NOT NULL,
-    instance_id INTEGER NOT NULL,
-    model0_score REAL,
-    model1_score REAL,
-    winner TEXT CHECK( winner IN ('model0', 'model1', 'tie') ),
+    task_name TEXT NOT NULL,
+    doc_id INTEGER NOT NULL,
+
+    model0_name TEXT NOT NULL,
+    model0_quant TEXT NOT NULL,
+    model0_args TEXT NOT NULL,
+
+    model1_name TEXT NOT NULL,
+    model1_quant TEXT NOT NULL,
+    model1_args TEXT NOT NULL,
+
+    model0_elo REAL NOT NULL,
+    model1_elo REAL NOT NULL,
+
+    winner TEXT CHECK(winner IN ('model0', 'model1', 'draw')),
+
     FOREIGN KEY (match_id) REFERENCES MATCH(match_id),
-    FOREIGN KEY (instance_id) REFERENCES INSTANCE(instance_id)
+    FOREIGN KEY (task_name, doc_id) REFERENCES INSTANCE(task_name, doc_id),
+    FOREIGN KEY (model0_name, model0_quant, model0_args) REFERENCES MODEL(model_name, quantization_level, model_args),
+    FOREIGN KEY (model1_name, model1_quant, model1_args) REFERENCES MODEL(model_name, quantization_level, model_args)
 );
 """
 
 _INDEX_DEFS = [
 "CREATE INDEX IF NOT EXISTS idx_task_dataset_name ON TASK(task_name);",
-"CREATE INDEX IF NOT EXISTS idx_instance_split ON INSTANCE(split);",
 "CREATE INDEX IF NOT EXISTS idx_tournament_name ON TOURNAMENT(tournament_name);",
-"CREATE INDEX IF NOT EXISTS idx_match_models ON MATCH(model0, model1);",
-"CREATE INDEX IF NOT EXISTS idx_match_result_match ON MATCH_RESULT(match_id);",
-"CREATE INDEX IF NOT EXISTS idx_match_result_instance ON MATCH_RESULT(instance_id);"
 ]
 
 _INSERT_TOURNAMENT = """
@@ -133,9 +140,8 @@ def _initialize_database(cursor):
     cursor.execute(_INSTANCE_TABLE_DEF)
     cursor.execute(_TOURNAMENT_TABLE_DEF)
     cursor.execute(_MATCH_TABLE_DEF)
-    cursor.execute(_MATCH_TASK_TABLE_DEF)
-    cursor.execute(_MATCH_RESULT_TABLE_DEF)
     cursor.execute(_MATCH_SCHEDULE_DEF)
+    cursor.execute(_INSTANCE_UPDATE_TABLE_DEF)
 
     # create indexes
     cursor.execute("BEGIN TRANSACTION")
@@ -258,7 +264,6 @@ class ScoreDatabase:
         self.cursor.execute("SELECT 1 FROM TASK WHERE task_name = ?", (task_name,))
         return self.cursor.fetchone() is not None
     
-
     def insert_task(self, task_name, output_type, num_instances):
         try:
             self.cursor.execute("""
@@ -296,6 +301,87 @@ class ScoreDatabase:
         except sqlite3.IntegrityError:
             self.database.rollback()
             return None
+        
+    def instance_exists(self, ir: InstanceRecord) -> bool:
+        
+        query = """
+        SELECT 1 FROM INSTANCE
+        WHERE task_name = ? AND doc_id = ?
+        """
+        params = [ir.task_name, ir.doc_id]
+        self.cursor.execute(query, params)
+        return self.cursor.fetchone() is not None
+
+    def insert_instance(self, ir : InstanceRecord):
+        try:
+            self.cursor.execute("""
+            INSERT INTO INSTANCE (task_name, doc_id, doc_hash, prompt_hash, target_hash)
+            VALUES (?, ?, ?, ?, ?)
+            """, (ir.task_name, ir.doc_id, ir.doc_hash, ir.prompt_hash, ir.target_hash)
+            )
+            self.database.commit()
+            return self.cursor.lastrowid
+        except sqlite3.IntegrityError:
+            self.database.rollback()
+            return None
+
+    def insert_instance_update(self, iu : InstanceUpdate):
+        try:
+            self.cursor.execute("""
+            INSERT INTO INSTANCE_UPDATE (match_id, task_name, doc_id, model0_name, model0_quant, model0_args, model1_name, model1_quant, model1_args, model0_elo, model1_elo, winner) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (iu.match_id, iu.task_name, iu.doc_id, iu.model0_name, iu.model0_quantization, iu.model0_args, iu.model1_name, iu.model1_quantization, iu.model1_args, iu.model0_elo, iu.model1_elo, iu.winner))
+            
+            self.database.commit()
+            return self.cursor.lastrowid
+        except sqlite3.IntegrityError as e:
+            print(f"instance_update insert error: {e}")
+            self.database.rollback()
+            return None
+
+    def update_instance_records(self, match : Match, samples0, samples1):
+        for schedule_idx, sample_0, sample_1 in zip(match.schedule, samples0, samples1):
+            assert(sample_0['doc_id'] == sample_1['doc_id'])
+
+            instance_record = InstanceRecord(
+                task_name=match.task,
+                doc_id=schedule_idx,
+                doc_hash=sample_0['doc_hash'],
+                prompt_hash=sample_0['prompt_hash'],
+                target_hash=sample_0['target_hash']
+            )
+
+            if not self.instance_exists(instance_record):
+                self.insert_instance(instance_record)
+
+    def record_instance_updates(self, 
+                                match : Match, 
+                                match_id : int, 
+                                samples0, 
+                                samples1, 
+                                elo_0 : float, 
+                                elo_1 : float, 
+                                winners : List[str]):
+
+        for idx, (sample_0, sample_1) in enumerate(zip(samples0, samples1)):
+            assert(sample_0['doc_id'] == sample_1['doc_id'])
+
+            instance_update = InstanceUpdate(
+                match_id=match_id,
+                task_name=match.task,
+                doc_id = match.schedule[idx],
+                model0_name = match.model0_key[0],
+                model0_quantization=match.model0_key[1],
+                model0_args=match.model0_key[2],
+                model0_elo=elo_0,
+                model1_name = match.model1_key[0],
+                model1_quantization=match.model1_key[1],
+                model1_args=match.model1_key[2],
+                model1_elo=elo_1,
+                winner=winners[idx]
+            )
+
+            self.insert_instance_update(instance_update)
 
     def insert_match(self, m : Match):
         tournament_name = m.tournament_name
@@ -316,21 +402,9 @@ class ScoreDatabase:
                 self.insert_match_schedule(id, index)
 
             return id
-            #return self.cursor.lastrowid
         except sqlite3.IntegrityError:
             self.database.rollback()
             return None
-
-    def get_task_instance_scores(self, task_name, instance_idx):
-        pass
-
-    def set_task_instance_score(self, task_name, instance_idx, model_name, score):
-        pass
-
-    def get_task_average_score(self, task_name):
-        # this should be computed from (task, instance, model, score) tuples
-        pass
-
 
 
 
