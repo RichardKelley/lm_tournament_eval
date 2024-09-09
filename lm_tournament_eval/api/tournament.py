@@ -279,8 +279,9 @@ class Tournament:
                                                 )
                 del model0._model
                 gc.collect()
-                torch.cuda.empty_cache()
-                torch.cuda.reset_peak_memory_stats()
+                if model0.device != "mps":
+                    torch.cuda.empty_cache()
+                    torch.cuda.reset_peak_memory_stats()
 
                 model1_type, model1_name = parse_model_name(self.config.model1_name)
                 model1 = load_model(model1_type,
@@ -308,8 +309,9 @@ class Tournament:
                                                 )
                 del model1._model
                 gc.collect()
-                torch.cuda.empty_cache()
-                torch.cuda.reset_peak_memory_stats()
+                if model1.device != "mps":
+                    torch.cuda.empty_cache()
+                    torch.cuda.reset_peak_memory_stats()
 
                 match_dict0 = results0['configs'][task_name]
                 match_dict1 = results1['configs'][task_name]
