@@ -6,6 +6,8 @@ import datetime
 import os
 import csv
 
+from tqdm import tqdm
+
 from lm_tournament_eval import utils
 from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
 from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
@@ -63,6 +65,8 @@ def run_roundrobin_eval():
     tournament_idxs = get_roundrobin_schedule(len(model_list))
     tournament_list = [(model_list[i], model_list[j]) for (i,j) in tournament_idxs]
 
+    pbar = tqdm(total=len(tournament_list), disable=False, desc="Running roundrobin tournament.")
+
     for t in tournament_list:
         model0 = t[0]
         model1 = t[1]
@@ -101,6 +105,7 @@ def run_roundrobin_eval():
         db.record_tournament(tournament)
 
         tournament.run_tournament()
+        pbar.update(1)
 
 if __name__ == '__main__':
     run_roundrobin_eval()
