@@ -6,3 +6,4 @@ lm_tournament_eval.egg-info/
 *.log
 site/
 dist/
+wandb/

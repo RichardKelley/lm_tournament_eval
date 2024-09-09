@@ -7,6 +7,7 @@ import os
 import csv
 
 from tqdm import tqdm
+import wandb
 
 from lm_tournament_eval import utils
 from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
@@ -24,7 +25,8 @@ from lm_tournament_eval.scripts.script_args import (
     setup_scheduler,
     setup_trust_remote_code,
     setup_filter_list,
-    setup_roundrobin_models
+    setup_roundrobin_models,
+    setup_wandb
 )
 
 def get_roundrobin_schedule(num_models):
@@ -50,6 +52,8 @@ def get_roundrobin_schedule(num_models):
 def run_roundrobin_eval():
     parser = setup_parser()
     args = parser.parse_args()
+
+    use_wandb = setup_wandb(args)
 
     task_manager = TaskManager(args.verbosity, include_path=args.include_path)
     task_names = validate_tasks(args, task_manager)
@@ -91,7 +95,8 @@ def run_roundrobin_eval():
                               random_seed=args.random_seed,
                               numpy_random_seed=args.numpy_random_seed,
                               torch_random_seed=args.torch_random_seed,
-                              fewshot_random_seed=args.fewshot_random_seed
+                              fewshot_random_seed=args.fewshot_random_seed,
+                              use_wandb=use_wandb
                              )
         
         tournament = Tournament(

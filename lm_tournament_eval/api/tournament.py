@@ -9,6 +9,8 @@ import gc
 
 from hflm import LM
 
+import wandb
+
 from dataclasses import dataclass
 from lm_tournament_eval.caching.cache import delete_cache
 
@@ -55,6 +57,7 @@ class TournamentConfig:
     numpy_random_seed : int
     torch_random_seed : int
     fewshot_random_seed : int
+    use_wandb : bool
 
 class Tournament:
     def __init__(self, 
@@ -329,3 +332,9 @@ class Tournament:
 
                     self.db.set_model_score(*self.model0_key, self.elo.score_0)
                     self.db.set_model_score(*self.model1_key, self.elo.score_1)
+
+                    if self.config.use_wandb:
+                        wandb.log({
+                            str(self.model0_key) : self.elo.score_0,
+                            str(self.model1_key) : self.elo.score_1,                            
+                        })

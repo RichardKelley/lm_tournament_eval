@@ -10,6 +10,7 @@ import argparse
 import logging
 import sys
 import os
+import time
 
 from typing import List, Tuple
 
@@ -66,8 +67,19 @@ def setup_parser() -> argparse.ArgumentParser:
                         help="Semicolon-separated list of model args")
     parser.add_argument("--roundrobin_file", type=str, default=None,
                         help="Path to a file containing models to use for roundrobin evaluation.")
+    
+    parser.add_argument("--wandb_project", type=str, default=None,
+                        help="Name of a Weights and Biases project to record elos at.")
 
     return parser
+
+def setup_wandb(args) -> bool:
+    if args.wandb_project is not None:
+        import wandb
+        wandb.init(project=args.wandb_project, name="run-" + str(time.time()))
+        return True
+    else:
+        return False
 
 def setup_roundrobin_models(args) -> List[Tuple]:
     if args.model_list is not None and args.roundrobin_file is not None:
