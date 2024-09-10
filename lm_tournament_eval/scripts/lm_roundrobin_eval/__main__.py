@@ -29,6 +29,9 @@ from lm_tournament_eval.scripts.script_args import (
     setup_wandb
 )
 
+from lm_tournament_eval.api.model_utils import load_model, parse_model_name
+from lm_tournament_eval.utils import simple_parse_args_string
+
 def get_roundrobin_schedule(num_models):
     players = list(range(num_models))
     if num_models % 2 != 0:
@@ -66,6 +69,24 @@ def run_roundrobin_eval():
 
     model_list = setup_roundrobin_models(args)
 
+    logging.info(f"Dry run loading models to meta device...")
+    for model in model_list:
+        logging.info(f"Loading {model}")
+        try:
+            model_type, model_name = parse_model_name(model[0])
+            kwargs = simple_parse_args_string(model[1])
+            if "trust_remote_code" in kwargs:
+                trust_remote_code = kwargs["trust_remote_code"]
+            else:
+                trust_remote_code = False
+            model = load_model(model_type, 
+                                model_name,
+                                {"trust_remote_code" : trust_remote_code},
+                                device="meta")
+            logging.info(f"Successfully loaded {model}")
+        except Exception as e:
+            logging.error(e)
+    
     tournament_idxs = get_roundrobin_schedule(len(model_list))
     tournament_list = [(model_list[i], model_list[j]) for (i,j) in tournament_idxs]
 
