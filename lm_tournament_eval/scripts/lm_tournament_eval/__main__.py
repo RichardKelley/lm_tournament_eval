@@ -21,13 +21,15 @@ from lm_tournament_eval.scripts.script_args import (
     validate_tasks,
     setup_scheduler,
     setup_trust_remote_code,
-    setup_filter_list
+    setup_filter_list,
+    setup_wandb
 )
 
 def run_tournament():
 
     parser = setup_parser()
     args = parser.parse_args()
+    use_wandb = setup_wandb(args)
 
     task_manager = TaskManager(args.verbosity, include_path=args.include_path)
     task_names = validate_tasks(args, task_manager)
@@ -78,7 +80,8 @@ def run_tournament():
                               random_seed=args.random_seed,
                               numpy_random_seed=args.numpy_random_seed,
                               torch_random_seed=args.torch_random_seed,
-                              fewshot_random_seed=args.fewshot_random_seed
+                              fewshot_random_seed=args.fewshot_random_seed,
+                              use_wandb=use_wandb
                              )
 
         tournament = Tournament(
