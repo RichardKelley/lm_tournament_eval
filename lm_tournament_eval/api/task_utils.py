@@ -7,7 +7,8 @@ from lm_tournament_eval.tasks import (
 from lm_tournament_eval.evaluator_utils import (
     get_task_list,
     get_sample_size,
-    print_writeout
+    print_writeout,
+    set_filters
 )
 from lm_tournament_eval.api.task import Task
 
@@ -36,19 +37,9 @@ def prepare_tasks(tasks, task_manager, verbosity,
         )
 
     task_dict = get_task_dict(tasks, task_manager)
+    set_filters(task_dict, cmd_filter) # this is still potentially broken for groups
 
-    filter_found = False
-    filter_names = []
-    for task_name in task_dict.keys():
-        for filter in task_dict[task_name]._filters:
-            if filter.name == cmd_filter:
-                filter_found = True
-                task_dict[task_name]._filters = [filter]
-            filter_names.append(filter.name)
-    if filter_found is False:
-        raise ValueError(
-            f"User specified filter {cmd_filter} not found in the task yaml. Available filters are: {filter_names}"
-        )
+
     # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
     # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)
     def _adjust_config(task_dict):
