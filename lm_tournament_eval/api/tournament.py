@@ -49,7 +49,7 @@ class TournamentConfig:
     model1_args : str
     task_names : str
     rounds : int
-    batch_size : int
+    batch_size : Union[str, int]
     gen_kwargs : str
     device : str
     limit : int
@@ -264,7 +264,6 @@ class Tournament:
                                         model0_name,
                                         self.config.model0_args,
                                         batch_size=self.config.batch_size,
-                                        max_batch_size=self.config.batch_size,
                                         device=self.config.device)        
 
                     rank = model0._rank
@@ -295,7 +294,6 @@ class Tournament:
                                         model1_name,
                                         self.config.model1_args,
                                         batch_size=self.config.batch_size,
-                                        max_batch_size=self.config.batch_size,
                                         device=self.config.device)
 
                     requests1, padding_reqests1 = create_requests(model1,

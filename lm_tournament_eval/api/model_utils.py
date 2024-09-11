@@ -79,8 +79,7 @@ def parse_model_name(model_name) -> Tuple[str, str]:
         # assume we're in the hf case.
         return ("hf", model_name)
 
-def load_model(model_type, model, model_args, batch_size: int = 1,
-               max_batch_size: int = 1, device: str = "cuda:0"):
+def load_model(model_type, model, model_args, batch_size: int = 1, device: str = "cuda:0"):
 
     # load model0 to device
     if isinstance(model, str):
@@ -100,7 +99,6 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                         model_args,
                         {
                             "batch_size" : batch_size,
-                            "max_batch_size" : max_batch_size,
                             "device":  device,
                         },
                     )
@@ -131,7 +129,6 @@ def load_model(model_type, model, model_args, batch_size: int = 1,
                         model_args,
                         {
                             "batch_size": batch_size,
-                            "max_batch_size": max_batch_size,
                             "device": device,
                         }
                     )

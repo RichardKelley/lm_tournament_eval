@@ -24,7 +24,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tasks", "-t", default=None, type=str, metavar="task1,task2")
     parser.add_argument("--filter", default='none', type=str, metavar="filter1,filter2")
     parser.add_argument("--num_rounds", default=1, type=int)
-    parser.add_argument("--batch_size", "-b", default=1, type=int)
+    parser.add_argument("--batch_size", "-b", default="1", type=str)
     parser.add_argument("--gen_kwargs", type=str, default=None, help=("String arguments for model generation on greedy_until tasks, e.g. `temperature=0,top_k=0,top_p=0`."))
     parser.add_argument("--match_size", default=1, type=int)
     parser.add_argument("--device", type=str, default="cuda:0")
@@ -222,3 +222,9 @@ def setup_filter_list(args, task_names):
         filter_list = [args.filter]
 
     return filter_list
+
+def setup_batch_size(args):
+    if args.batch_size == 'auto':
+        return args.batch_size
+    else:
+        return int(args.batch_size)

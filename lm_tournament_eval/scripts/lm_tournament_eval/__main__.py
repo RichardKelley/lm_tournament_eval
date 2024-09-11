@@ -22,7 +22,8 @@ from lm_tournament_eval.scripts.script_args import (
     setup_scheduler,
     setup_trust_remote_code,
     setup_filter_list,
-    setup_wandb
+    setup_wandb,
+    setup_batch_size
 )
 
 def run_tournament():
@@ -30,6 +31,7 @@ def run_tournament():
     parser = setup_parser()
     args = parser.parse_args()
     use_wandb = setup_wandb(args)
+    args.batch_size = setup_batch_size(args)
 
     task_manager = TaskManager(args.verbosity, include_path=args.include_path)
     task_names = validate_tasks(args, task_manager)
