@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lm-tournament-eval"
-version = "0.0.1"
+version = "0.0.2"
 description = "A framework for evaluating language models using dataset tournaments."
 readme = "README.md"
 authors = [
@@ -20,5 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-lm-tournament-eval = "lm_tournament_eval.__main__:run_tournament"
-lm_tournament_eval = "lm_tournament_eval.__main__:run_tournament"
+lm-tournament-eval = "lm_tournament_eval.scripts.lm_tournament_eval.__main__:run_tournament"
+lm_tournament_eval = "lm_tournament_eval.scripts.lm_tournament_eval.__main__:run_tournament"
+lm-roundrobin-eval = "lm_tournament_eval.scripts.lm_roundrobin_eval.__main__:run_roundrobin_eval"
+lm_roundrobin_eval = "lm_tournament_eval.scripts.lm_roundrobin_eval.__main__:run_roundrobin_eval"

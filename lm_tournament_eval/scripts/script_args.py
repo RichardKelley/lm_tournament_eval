@@ -1,20 +1,18 @@
-import argparse
-import json
-import sys
-import logging
-import datetime
-import os
-import csv
-
 from lm_tournament_eval import utils
-from lm_tournament_eval.api.tournament import TournamentConfig, Tournament
-from lm_tournament_eval.api.offline_tournament import OfflineTournamentConfig, OfflineTournament
-from lm_tournament_eval.api.task import TaskConfig
-from lm_tournament_eval.tasks import TaskManager
-from lm_tournament_eval.evaluator_utils import request_caching_arg_to_dict
-from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler, DefaultScheduler
+from lm_tournament_eval.api.scheduler import (
+    Scheduler,
+    FileScheduler, 
+    SamplingScheduler, 
+    DefaultScheduler
+)
 
-from lm_tournament_eval.score_database import ScoreDatabase
+import argparse
+import logging
+import sys
+import os
+import time
+
+from typing import List, Tuple
 
 def setup_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
@@ -60,21 +58,69 @@ def setup_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sampling_schedule", type=bool, default=None,
                         help="Triggers sampling with replacement.")
     
-    parser.add_argument("--db_path", type=str, default=None,
+    parser.add_argument("--db_path", type=str, default="elo.db",
                         help="Path to sqlite3 database file.")
+
+    parser.add_argument("--model_list", type=str, default=None,
+                        help="Comma-separated list of models for roundrobin evaluation.")
+    parser.add_argument("--model_arg_list", type=str, default=None,
+                        help="Semicolon-separated list of model args")
+    parser.add_argument("--roundrobin_file", type=str, default=None,
+                        help="Path to a file containing models to use for roundrobin evaluation.")
+    
+    parser.add_argument("--wandb_project", type=str, default=None,
+                        help="Name of a Weights and Biases project to record elos at.")
 
     return parser
 
+def setup_wandb(args) -> bool:
+    if args.wandb_project is not None:
+        import wandb
+        wandb.init(project=args.wandb_project, name="run-" + str(time.time()))
+        return True
+    else:
+        return False
 
-def run_tournament():
+def setup_roundrobin_models(args) -> List[Tuple]:
+    if args.model_list is not None and args.roundrobin_file is not None:
+        logging.error("At most one of model_list and roundrobin_file can be not None.")
+        sys.exit()
 
-    # handle arguments.
-    parser = setup_parser()
-    args = parser.parse_args()
+    if args.roundrobin_file is None and args.model_list is None:
+        logging.error(f"Need --model_list or --roundrobin_file.")
+        sys.exit()
 
+    model_name_list = []
+    arg_list = []
+
+    if args.roundrobin_file is not None:
+        with open(args.roundrobin_file, 'r') as f:
+            for line in f:
+                assert(';' in line)
+                model_str, args_str = line.split(';')
+                model_str = model_str.strip()
+                args_str = args_str.strip()
+                model_name_list.append(model_str)
+                arg_list.append(args_str)
+
+    if args.model_list is not None:
+    
+        model_name_list = args.model_list.split(',')
+        model_name_list = [name.strip() for name in model_name_list]
+
+        if args.model_arg_list is not None:
+            arg_list = args.model_arg_list.split(';')
+            assert(len(arg_list) == len(model_name_list))
+        else:
+            arg_list = ['' for _ in model_name_list]
+
+    ret = zip(model_name_list, arg_list)
+
+    return list(ret)
+
+def validate_tasks(args, task_manager):
     if args.include_path is not None:
         logging.info(f"Including path: {args.include_path}")
-    task_manager = TaskManager(args.verbosity, include_path=args.include_path)
 
     if args.tasks is None:
         logging.error("Need to specify a task to evaluate.")    
@@ -119,40 +165,18 @@ def run_tournament():
                 missing = ", ".join(task_missing)
                 logging.error(
                     f"Tasks were not found: {missing}\n"
-                    f"{utils.SPACING}Try `lm-eval --tasks list` for list of available tasks",
+                    f"{utils.SPACING}Try `lm-tournament-eval --tasks list` for list of available tasks",
                 )
                 raise ValueError(
-                    f"Tasks not found: {missing}. Try `lm-eval --tasks {{list_groups,list_subtasks,list_tags,list}}` to list out all available names for task groupings; only (sub)tasks; tags; or all of the above, or pass '--verbosity DEBUG' to troubleshoot task registration issues."
+                    f"Tasks not found: {missing}. Try `lm-tournament-eval --tasks {{list_groups,list_subtasks,list_tags,list}}` to list out all available names for task groupings; only (sub)tasks; tags; or all of the above, or pass '--verbosity DEBUG' to troubleshoot task registration issues."
                 )
-
-    # Respect user's value passed in via CLI, otherwise default to True and add to comma-separated model args
-    if args.trust_remote_code:
-        logging.info(
-            "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
-        )
-        # HACK: import datasets and override its HF_DATASETS_TRUST_REMOTE_CODE value internally,
-        # because it's already been determined based on the prior env var before launching our
-        # script--`datasets` gets imported by lm_eval internally before these lines can update the env.
-        import datasets
-
-        datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
-
-        args.model_args = args.model_args + ",trust_remote_code=True"
-
-    if args.db_path is not None:
-        db = ScoreDatabase(args.db_path)
-
+            
     logging.info(f"Selected Tasks: {task_names}")
 
-    if ',' in args.filter:
-        filter_list = args.filter.split(',')
-        if len(filter_list) != len(task_names):
-            raise ValueError(
-                f"Filter list length {len(filter_list)} does not match task list length {len(task_list)}. Provide one filter per task."
-            )
-    else:
-        filter_list = [args.filter]
+    return task_names
 
+def setup_scheduler(args) -> Scheduler:
+    
     # set up scheduler
     if args.file_schedule is not None and args.sampling_schedule is not None:
         logging.error("Cannot set file_schedule and sampling_schedule at same time.")
@@ -168,67 +192,33 @@ def run_tournament():
     else:
         scheduler = DefaultScheduler(rounds=args.num_rounds, match_size=args.match_size)
 
-    if args.limit is not None:
-        scheduler.set_limit(args.limit)
+    return scheduler
 
-    formatted_date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    args.tournament_name = "{}.{}.{}".format(formatted_date, args.model0, args.model1)
-    
-    # set up local logger.
-    # set up wandb logger.
+def setup_trust_remote_code(args):
+    # Respect user's value passed in via CLI, otherwise default to True and add to comma-separated model args
+    if args.trust_remote_code:
+        logging.info(
+            "Passed `--trust_remote_code`, setting environment variable `HF_DATASETS_TRUST_REMOTE_CODE=true`"
+        )
+        # HACK: import datasets and override its HF_DATASETS_TRUST_REMOTE_CODE value internally,
+        # because it's already been determined based on the prior env var before launching our
+        # script--`datasets` gets imported by lm_eval internally before these lines can update the env.
+        import datasets
 
-    if args.offline == True:
-        # validate tournament parameters.
-        task_config = TaskConfig()
-        cfg = OfflineTournamentConfig(name=args.tournament_name,
-                                      offline_file_0=args.offline_file_0,
-                                      offline_file_1=args.offline_file_1,
-                                      task_name=args.tasks,
-                                      rounds=args.num_rounds,
-                                      num_samples=args.match_size,
-                                      task_config=task_config,
-                                      model0_name = args.model0,
-                                      model1_name = args.model1
-                                     )
-        # create offline tournament
-        tournament = OfflineTournament(cfg)
+        datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
 
-        # run tournament evaluator.
-        result = tournament.run_tournament()    
+        args.model_args = args.model_args + ",trust_remote_code=True"
+
+    return args
+
+def setup_filter_list(args, task_names):
+    if ',' in args.filter:
+        filter_list = args.filter.split(',')
+        if len(filter_list) != len(task_names):
+            raise ValueError(
+                f"Filter list length {len(filter_list)} does not match task list length {len(task_names)}. Provide one filter per task."
+            )
     else:
-        # validate tournament parameters.
-        cfg = TournamentConfig(name=args.tournament_name,
-                              rounds=args.num_rounds,
-                              model0_name=args.model0,
-                              model0_args=args.model0_args,
-                              model1_name=args.model1,
-                              model1_args=args.model1_args,
-                              task_names=task_names,
-                              batch_size=args.batch_size,
-                              gen_kwargs=args.gen_kwargs,
-                              device=args.device,
-                              limit=args.limit,
-                              match_size=args.match_size,
-                              cmd_filter=filter_list,
-                              random_seed=args.random_seed,
-                              numpy_random_seed=args.numpy_random_seed,
-                              torch_random_seed=args.torch_random_seed,
-                              fewshot_random_seed=args.fewshot_random_seed
-                             )
+        filter_list = [args.filter]
 
-        #create tournament
-        tournament = Tournament(
-            cfg, 
-            task_names, 
-            task_manager, 
-            args.verbosity, 
-            scheduler,
-            db=db)
-
-        db.record_tournament(tournament)
-
-        tournament.run_tournament()
-
-
-if __name__ == "__main__":
-    run_tournament()
+    return filter_list
