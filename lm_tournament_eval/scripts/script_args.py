@@ -165,10 +165,10 @@ def validate_tasks(args, task_manager):
                 missing = ", ".join(task_missing)
                 logging.error(
                     f"Tasks were not found: {missing}\n"
-                    f"{utils.SPACING}Try `lm-eval --tasks list` for list of available tasks",
+                    f"{utils.SPACING}Try `lm-tournament-eval --tasks list` for list of available tasks",
                 )
                 raise ValueError(
-                    f"Tasks not found: {missing}. Try `lm-eval --tasks {{list_groups,list_subtasks,list_tags,list}}` to list out all available names for task groupings; only (sub)tasks; tags; or all of the above, or pass '--verbosity DEBUG' to troubleshoot task registration issues."
+                    f"Tasks not found: {missing}. Try `lm-tournament-eval --tasks {{list_groups,list_subtasks,list_tags,list}}` to list out all available names for task groupings; only (sub)tasks; tags; or all of the above, or pass '--verbosity DEBUG' to troubleshoot task registration issues."
                 )
             
     logging.info(f"Selected Tasks: {task_names}")
