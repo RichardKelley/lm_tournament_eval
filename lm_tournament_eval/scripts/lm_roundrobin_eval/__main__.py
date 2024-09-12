@@ -26,7 +26,8 @@ from lm_tournament_eval.scripts.script_args import (
     setup_trust_remote_code,
     setup_filter_list,
     setup_roundrobin_models,
-    setup_wandb
+    setup_wandb,
+    setup_batch_size
 )
 
 from lm_tournament_eval.api.model_utils import load_model, parse_model_name
@@ -57,6 +58,8 @@ def run_roundrobin_eval():
     args = parser.parse_args()
 
     use_wandb = setup_wandb(args)
+
+    args.batch_size = setup_batch_size(args)
 
     task_manager = TaskManager(args.verbosity, include_path=args.include_path)
     task_names = validate_tasks(args, task_manager)
