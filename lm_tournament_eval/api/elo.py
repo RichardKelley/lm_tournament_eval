@@ -46,14 +46,20 @@ class ELO:
             match m.output_type:
                 case 'generate_until':
                     for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
-                        if result0['exact_match'] == 1.0:
-                            answers0.append(1)
-                        else:
-                            answers0.append(0)
-                        if result1['exact_match'] == 1.0:
-                            answers1.append(1)
-                        else:
-                            answers1.append(0)
+                        breakpoint()
+                        if 'exact_match' in result0.keys():
+                            if result0['exact_match'] == 1.0:
+                                answers0.append(1)
+                            else:
+                                answers0.append(0)
+                            if result1['exact_match'] == 1.0:
+                                answers1.append(1)
+                            else:
+                                answers1.append(0)
+                        #ifeval case: average prompt_level_strict_acc and inst_level_strict_acc
+                        elif 'prompt_level_strict_acc' in result0.keys():
+                            answers0.append((int(result0['prompt_level_strict_acc']) + sum(result0['inst_level_strict_acc'])/len(result0['inst_level_strict_acc']))/2)
+                            answers1.append((int(result1['prompt_level_strict_acc']) + sum(result1['inst_level_strict_acc'])/len(result0['inst_level_strict_acc']))/2)
                 case 'loglikelihood' | "multiple_choice":
                     for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
                         nll0 = [response[0][0] for response in result0["resps"]]
