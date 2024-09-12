@@ -22,6 +22,7 @@ from lm_tournament_eval.utils import simple_parse_args_string
 
 from typing import Optional, Union, Dict, List, Tuple
 from lm_tournament_eval.loggers import EvaluationTracker
+from lm_tournament_eval.evaluator_utils import get_task_groups
 from lm_tournament_eval.api.elo import ELO
 from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
@@ -29,6 +30,7 @@ from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
 from lm_tournament_eval.api.task import Task
 from lm_tournament_eval.score_database import ScoreDatabase
 from lm_tournament_eval.api.match import Match
+from lm_tournament_eval.api.group import ConfigurableGroup
 
 from lm_tournament_eval.loggers.utils import (
      add_env_info, 
@@ -229,8 +231,6 @@ class Tournament:
             logging.info(" | ".join(seed_message))
 
         for task_name in self.tasks:
-            logging.info(f"Current task: {task_name}")
-
             task_idx = self.tasks.index(task_name)
             filter = self.config.cmd_filter[task_idx]
 
@@ -240,101 +240,105 @@ class Tournament:
                                                   cmd_filter=filter,
                                                   gen_kwargs=self.config.gen_kwargs)
 
-            self.scheduler.set_task_size(len(task_dict[task_name].eval_docs))
+            task_dict = get_task_groups(task_dict)
 
-            if not self.db.task_exists(task_name):
-                task = task_dict[task_name]
-                self.db.insert_task(task_name=task_name, 
-                                    output_type=task.config.output_type, 
-                                    num_instances=len(task.eval_docs))
+            for task_name, task_output in zip(task_dict.keys(), eval_tasks):
+                logging.info(f"Current task: {task_name}")
+                self.scheduler.set_task_size(len(task_dict[task_name].eval_docs))
 
-            original_task = deepcopy(task_dict[task_name])
-            rank = 0
-            for match_schedule in self.scheduler:
-                logging.info(f"Current match indices: {match_schedule}")
+                if not self.db.task_exists(task_name):
+                    task = task_dict[task_name]
+                    self.db.insert_task(task_name=task_name, 
+                                        output_type=task.config.output_type, 
+                                        num_instances=len(task.eval_docs))
 
-                subtask = create_subtask(original_task, schedule=match_schedule)
-                
-                model0_type, model0_name = parse_model_name(self.config.model0_name)
-                model0 = load_model(model0_type, 
-                                    model0_name,
-                                    self.config.model0_args,
-                                    batch_size=self.config.batch_size,
-                                    max_batch_size=self.config.batch_size,
-                                    device=self.config.device)        
+                original_task = deepcopy(task_dict[task_name])
+                rank = 0
+                for match_schedule in self.scheduler:
+                    logging.info(f"Current match indices: {match_schedule}")
 
-                rank = model0._rank
-                requests0, padding_reqests0 = create_requests(model0, 
-                                                              task=subtask,
-                                                              limit=self.config.limit)
+                    subtask = create_subtask(original_task, schedule=match_schedule)
+                    
+                    model0_type, model0_name = parse_model_name(self.config.model0_name)
+                    model0 = load_model(model0_type, 
+                                        model0_name,
+                                        self.config.model0_args,
+                                        batch_size=self.config.batch_size,
+                                        max_batch_size=self.config.batch_size,
+                                        device=self.config.device)        
 
-                results0 = self.tournament_evaluate(model=self.config.model0_name,
-                                                    lm=model0,
-                                                    model_args=self.config.model0_args,
-                                                    requests=requests0,
-                                                    task=subtask,
-                                                    eval_tasks=eval_tasks,
-                                                    task_dict=task_dict,
-                                                    padding_requests=padding_reqests0,
-                                                    batch_size=self.config.batch_size,
-                                                    device=self.config.device,
-                                                    limit=self.config.limit
-                                                )
-                del model0._model
-                gc.collect()
-                if model0.device != "mps":
-                    torch.cuda.empty_cache()
-                    torch.cuda.reset_peak_memory_stats()
+                    rank = model0._rank
+                    requests0, padding_reqests0 = create_requests(model0, 
+                                                                task=subtask,
+                                                                limit=self.config.limit)
 
-                model1_type, model1_name = parse_model_name(self.config.model1_name)
-                model1 = load_model(model1_type,
-                                    model1_name,
-                                    self.config.model1_args,
-                                    batch_size=self.config.batch_size,
-                                    max_batch_size=self.config.batch_size,
-                                    device=self.config.device)
+                    results0 = self.tournament_evaluate(model=self.config.model0_name,
+                                                        lm=model0,
+                                                        model_args=self.config.model0_args,
+                                                        requests=requests0,
+                                                        task=subtask,
+                                                        eval_tasks=[task_output],
+                                                        task_dict=task_dict,
+                                                        padding_requests=padding_reqests0,
+                                                        batch_size=self.config.batch_size,
+                                                        device=self.config.device,
+                                                        limit=self.config.limit
+                                                    )
+                    del model0._model
+                    gc.collect()
+                    if model0.device != "mps":
+                        torch.cuda.empty_cache()
+                        torch.cuda.reset_peak_memory_stats()
 
-                requests1, padding_reqests1 = create_requests(model1,
-                                                              task=subtask,
-                                                              limit=self.config.limit)
+                    model1_type, model1_name = parse_model_name(self.config.model1_name)
+                    model1 = load_model(model1_type,
+                                        model1_name,
+                                        self.config.model1_args,
+                                        batch_size=self.config.batch_size,
+                                        max_batch_size=self.config.batch_size,
+                                        device=self.config.device)
 
-                results1 = self.tournament_evaluate(model=self.config.model1_name,
-                                                    lm=model1,
-                                                    model_args=self.config.model1_args,
-                                                    requests=requests1,
-                                                    task=subtask,
-                                                    eval_tasks=eval_tasks,
-                                                    task_dict=task_dict,
-                                                    padding_requests=padding_reqests1,
-                                                    batch_size=self.config.batch_size,
-                                                    device=self.config.device,
-                                                    limit=self.config.limit
-                                                )
-                del model1._model
-                gc.collect()
-                if model1.device != "mps":
-                    torch.cuda.empty_cache()
-                    torch.cuda.reset_peak_memory_stats()
+                    requests1, padding_reqests1 = create_requests(model1,
+                                                                task=subtask,
+                                                                limit=self.config.limit)
 
-                match_dict0 = results0['configs'][task_name]
-                match_dict1 = results1['configs'][task_name]
-                m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
-                match_id = self.db.insert_match(m)
+                    results1 = self.tournament_evaluate(model=self.config.model1_name,
+                                                        lm=model1,
+                                                        model_args=self.config.model1_args,
+                                                        requests=requests1,
+                                                        task=subtask,
+                                                        eval_tasks=[task_output],
+                                                        task_dict=task_dict,
+                                                        padding_requests=padding_reqests1,
+                                                        batch_size=self.config.batch_size,
+                                                        device=self.config.device,
+                                                        limit=self.config.limit
+                                                    )
+                    del model1._model
+                    gc.collect()
+                    if model1.device != "mps":
+                        torch.cuda.empty_cache()
+                        torch.cuda.reset_peak_memory_stats()
 
-                self.db.update_instance_records(m, 
-                                                results0["samples"][task_name], 
-                                                results1["samples"][task_name])
+                    match_dict0 = results0['configs'][task_name]
+                    match_dict1 = results1['configs'][task_name]
+                    m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
+                    match_id = self.db.insert_match(m)
 
-                rounds_per_task = []
-                match_results = {}
-                if rank == 0:
-                    self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
+                    self.db.update_instance_records(m, 
+                                                    results0["samples"][task_name], 
+                                                    results1["samples"][task_name])
 
-                    self.db.set_model_score(*self.model0_key, self.elo.score_0)
-                    self.db.set_model_score(*self.model1_key, self.elo.score_1)
+                    rounds_per_task = []
+                    match_results = {}
+                    if rank == 0:
+                        self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
 
-                    if self.config.use_wandb:
-                        wandb.log({
-                            str(self.model0_key) : self.elo.score_0,
-                            str(self.model1_key) : self.elo.score_1,                            
-                        })
+                        self.db.set_model_score(*self.model0_key, self.elo.score_0)
+                        self.db.set_model_score(*self.model1_key, self.elo.score_1)
+
+                        if self.config.use_wandb:
+                            wandb.log({
+                                str(self.model0_key) : self.elo.score_0,
+                                str(self.model1_key) : self.elo.score_1,                            
+                            })

@@ -136,7 +136,6 @@ class TaskOutput:
             f"group_alias={self.group_alias})"
         )
 
-
 def get_task_list(task_dict: dict) -> List[TaskOutput]:
     outputs = []
     for task_name, task_obj in task_dict.items():
@@ -149,6 +148,33 @@ def get_task_list(task_dict: dict) -> List[TaskOutput]:
 
     return outputs
 
+def get_task_groups(task_dict):
+    task_dict_2 = {}
+    for task_name, task_obj in task_dict.items():
+        if isinstance(task_name, ConfigurableGroup):
+            task_dict_2.update(get_task_groups(task_obj))
+        else:
+            task_dict_2[task_name] = task_obj
+    return task_dict_2
+
+def set_filters(task_dict: dict, cmd_filter: str) -> List:
+    filter_found = False
+    filter_names = []
+    for task_name, task_obj in task_dict.items():
+        if isinstance(task_obj, dict):
+            _filter_names, filter_found = set_filters(task_obj, cmd_filter)
+            filter_names.extend(_filter_names)
+        else:
+            for filter in task_dict[task_name]._filters:
+                if filter.name == cmd_filter:
+                    filter_found = True
+                    task_dict[task_name]._filters = [filter]
+                filter_names.append(filter.name)
+    if filter_found is False:
+        raise ValueError(
+            f"User specified filter {cmd_filter} not found in the task yaml. Available filters are: {filter_names}"
+        )
+    return filter_names, filter_found
 
 def get_subtask_list(task_dict, task_root=None, depth=0):
     subtask_list = {}
