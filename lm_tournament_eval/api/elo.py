@@ -46,7 +46,6 @@ class ELO:
             match m.output_type:
                 case 'generate_until':
                     for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
-                        breakpoint()
                         if 'exact_match' in result0.keys():
                             if result0['exact_match'] == 1.0:
                                 answers0.append(1)
