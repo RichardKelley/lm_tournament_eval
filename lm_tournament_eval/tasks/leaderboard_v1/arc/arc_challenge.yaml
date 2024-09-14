@@ -1,0 +1,3 @@
+include: arc_easy.yaml
+task: leaderboard_v1_arc
+dataset_name: ARC-Challenge

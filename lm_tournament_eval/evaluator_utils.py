@@ -170,10 +170,20 @@ def set_filters(task_dict: dict, cmd_filter: str) -> List:
                     filter_found = True
                     task_dict[task_name]._filters = [filter]
                 filter_names.append(filter.name)
+
+    if filter_found is False:
+        if len(filter_names) > 0:
+            print(f"No filter specified. Using first filter {filter_names[0]}")
+            for filter in task_dict[task_name]._filters:
+                if filter.name == filter_names[0]:
+                    filter_found = True
+                    task_dict[task_name]._filters = [filter]
+
     if filter_found is False:
         raise ValueError(
             f"User specified filter {cmd_filter} not found in the task yaml. Available filters are: {filter_names}"
         )
+    
     return filter_names, filter_found
 
 def get_subtask_list(task_dict, task_root=None, depth=0):
