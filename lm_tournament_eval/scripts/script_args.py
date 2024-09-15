@@ -96,6 +96,8 @@ def setup_roundrobin_models(args) -> List[Tuple]:
     if args.roundrobin_file is not None:
         with open(args.roundrobin_file, 'r') as f:
             for line in f:
+                if line[0] == "#": 
+                    continue # skip comments
                 assert(';' in line)
                 model_str, args_str = line.split(';')
                 model_str = model_str.strip()
