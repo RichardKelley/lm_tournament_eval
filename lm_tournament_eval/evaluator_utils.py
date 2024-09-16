@@ -160,24 +160,21 @@ def get_task_groups(task_dict):
 def set_filters(task_dict: dict, cmd_filter: str) -> List:
     filter_found = False
     filter_names = []
+
     for task_name, task_obj in task_dict.items():
         if isinstance(task_obj, dict):
             _filter_names, filter_found = set_filters(task_obj, cmd_filter)
             filter_names.extend(_filter_names)
         else:
-            for filter in task_dict[task_name]._filters:
-                if filter.name == cmd_filter:
-                    filter_found = True
-                    task_dict[task_name]._filters = [filter]
-                filter_names.append(filter.name)
-
-    if filter_found is False:
-        if len(filter_names) > 0:
-            print(f"No filter specified. Using first filter {filter_names[0]}")
-            for filter in task_dict[task_name]._filters:
-                if filter.name == filter_names[0]:
-                    filter_found = True
-                    task_dict[task_name]._filters = [filter]
+            if cmd_filter in [f.name for f in task_dict[task_name]._filters]:
+                for filter in task_dict[task_name]._filters:
+                    if filter.name == cmd_filter:
+                        filter_found = True
+                        task_dict[task_name]._filters = [filter]
+            else:
+                filter_found = True
+                task_dict[task_name]._filters = [task_dict[task_name]._filters[0]]
+                filter_names.extend(task_dict[task_name]._filters)
 
     if filter_found is False:
         raise ValueError(
