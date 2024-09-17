@@ -60,6 +60,7 @@ class TournamentConfig:
     torch_random_seed : int
     fewshot_random_seed : int
     use_wandb : bool
+    elo_dynamics : str
 
 class Tournament:
     def __init__(self, 
@@ -118,8 +119,10 @@ class Tournament:
 
         self.elo = ELO(self.model0_key, 
                        self.model1_key, 
-                       self.db
+                       self.db,
+                       True if config.elo_dynamics == "unbounded" else False
                     )
+        
 
     def tournament_evaluate(
         self,

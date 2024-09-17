@@ -70,6 +70,9 @@ def setup_parser() -> argparse.ArgumentParser:
     
     parser.add_argument("--wandb_project", type=str, default=None,
                         help="Name of a Weights and Biases project to record elos at.")
+    
+    parser.add_argument("--elo_dynamics", type=str, default="unbounded", metavar="bounded|unbounded",
+                        help="Whether to use bounded or unbounded elo updates. Default unbounded.")
 
     return parser
 
