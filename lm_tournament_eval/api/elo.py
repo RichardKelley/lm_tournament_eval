@@ -10,7 +10,7 @@ def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
 
 MAX_SCORE_DIFF = 800
-RATING_FLOOR = 1100
+RATING_FLOOR = 100
 
 class ELO:
     def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True):
@@ -31,7 +31,7 @@ class ELO:
             self.db.insert_model(*model1_key)
             self.score_1 = 1200.0
 
-        self.k = 16
+        self.k = 10
         self.soft_ceiling=3000
         self.decay_factor=0.01
 
