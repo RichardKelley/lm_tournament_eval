@@ -121,7 +121,8 @@ def run_roundrobin_eval():
                               torch_random_seed=args.torch_random_seed,
                               fewshot_random_seed=args.fewshot_random_seed,
                               use_wandb=use_wandb,
-                              elo_dynamics=args.elo_dynamics
+                              elo_dynamics=args.elo_dynamics,
+                              ranking_system=args.ranking_system
                              )
         
         tournament = Tournament(

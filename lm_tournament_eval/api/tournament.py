@@ -24,6 +24,7 @@ from typing import Optional, Union, Dict, List, Tuple
 from lm_tournament_eval.loggers import EvaluationTracker
 from lm_tournament_eval.evaluator_utils import get_task_groups
 from lm_tournament_eval.api.elo import ELO
+from lm_tournament_eval.api.bt import BradleyTerryModel
 from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
 from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
@@ -61,6 +62,7 @@ class TournamentConfig:
     fewshot_random_seed : int
     use_wandb : bool
     elo_dynamics : str
+    ranking_system : str
 
 class Tournament:
     def __init__(self, 
@@ -117,12 +119,15 @@ class Tournament:
         elo_0 = db.get_model_score(*self.model0_key)
         elo_1 = db.get_model_score(*self.model1_key)
 
-        self.elo = ELO(self.model0_key, 
-                       self.model1_key, 
-                       self.db,
-                       True if config.elo_dynamics == "unbounded" else False
-                    )
-        
+        if self.config.ranking_system == "elo":
+            self.elo = ELO(self.model0_key, 
+                           self.model1_key, 
+                           self.db,
+                           True if config.elo_dynamics == "unbounded" else False)
+        if self.config.ranking_system == "bt":
+            self.bt = BradleyTerryModel(self.model0_key, 
+                                        self.model1_key, 
+                                        self.db)       
 
     def tournament_evaluate(
         self,
@@ -333,13 +338,21 @@ class Tournament:
                     rounds_per_task = []
                     match_results = {}
                     if rank == 0:
-                        self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
-
-                        self.db.set_model_score(*self.model0_key, self.elo.score_0)
-                        self.db.set_model_score(*self.model1_key, self.elo.score_1)
-
-                        if self.config.use_wandb:
-                            wandb.log({
-                                str(self.model0_key) : self.elo.score_0,
-                                str(self.model1_key) : self.elo.score_1,                            
-                            })
+                        if self.config.ranking_system == "elo":
+                            self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
+                            self.db.set_model_score(*self.model0_key, self.elo.score_0)
+                            self.db.set_model_score(*self.model1_key, self.elo.score_1)
+                            if self.config.use_wandb:
+                                wandb.log({
+                                    str(self.model0_key) : self.elo.score_0,
+                                    str(self.model1_key) : self.elo.score_1,                            
+                                })
+                        elif self.config.ranking_system == "bt":
+                            self.bt.create_results(results0, results1, self.config.task_names, self.config.match_size)
+                            self.db.set_model_score(*self.model0_key, self.bt.score_0)
+                            self.db.set_model_score(*self.model1_key, self.bt.score_1)
+                            if self.config.use_wandb:
+                                wandb.log({
+                                    str(self.model0_key) : self.bt.score_0,
+                                    str(self.model1_key) : self.bt.score_1,                            
+                                })

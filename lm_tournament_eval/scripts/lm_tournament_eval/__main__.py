@@ -83,7 +83,9 @@ def run_tournament():
                               numpy_random_seed=args.numpy_random_seed,
                               torch_random_seed=args.torch_random_seed,
                               fewshot_random_seed=args.fewshot_random_seed,
-                              use_wandb=use_wandb
+                              use_wandb=use_wandb,
+                              elo_dynamics=args.elo_dynamics,
+                              ranking_system=args.ranking_system
                              )
 
         tournament = Tournament(
