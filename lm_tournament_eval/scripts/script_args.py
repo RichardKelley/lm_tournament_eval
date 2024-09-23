@@ -70,6 +70,9 @@ def setup_parser() -> argparse.ArgumentParser:
     
     parser.add_argument("--wandb_project", type=str, default=None,
                         help="Name of a Weights and Biases project to record elos at.")
+    
+    parser.add_argument("--elo_dynamics", type=str, default="unbounded", metavar="bounded|unbounded",
+                        help="Whether to use bounded or unbounded elo updates. Default unbounded.")
 
     return parser
 
@@ -96,6 +99,8 @@ def setup_roundrobin_models(args) -> List[Tuple]:
     if args.roundrobin_file is not None:
         with open(args.roundrobin_file, 'r') as f:
             for line in f:
+                if line[0] == "#": 
+                    continue # skip comments
                 assert(';' in line)
                 model_str, args_str = line.split(';')
                 model_str = model_str.strip()

@@ -673,7 +673,7 @@ class Task(abc.ABC):
             self.sampler.rnd = self.fewshot_rnd
 
     @property
-    def eval_docs(self) -> Union[datasets.Dataset, List[dict]]:
+    def eval_docs(self) -> Union[datasets.Dataset, List[dict]]:        
         if self.has_test_docs():
             return self.test_docs()
         elif self.has_validation_docs():

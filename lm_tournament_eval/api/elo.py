@@ -1,3 +1,4 @@
+import math
 from .match import MatchResult, Match
 from typing import List, Dict
 import logging
@@ -7,15 +8,16 @@ from lm_tournament_eval.api.match import Match
 
 def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
-MAX_SCORE_DIFF = 800
 
 MAX_SCORE_DIFF = 800
+RATING_FLOOR = 100
 
 class ELO:
-    def __init__(self, model0_key, model1_key, db : ScoreDatabase):
+    def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True):
         self.model0_key = model0_key
         self.model1_key = model1_key
         self.db = db
+        self.unbounded = unbounded
 
         if self.db.check_model_exists(*model0_key):
             self.score_0 = self.db.get_model_score(*model0_key)
@@ -29,7 +31,23 @@ class ELO:
             self.db.insert_model(*model1_key)
             self.score_1 = 1200.0
 
-        self.k = 16
+        self.k = 10
+        self.soft_ceiling=3000
+        self.decay_factor=0.01
+
+    def _soft_ceiling(self, current_rating, rating_change):
+        if current_rating < self.soft_ceiling:
+            # Below the soft ceiling, apply the full rating change
+            new_rating = current_rating + rating_change
+        else:
+            # Above the soft ceiling, apply a diminishing rating change
+            distance_above_ceiling = current_rating - self.soft_ceiling
+            damping_factor = math.exp(-self.decay_factor * distance_above_ceiling)
+            adjusted_change = rating_change * damping_factor
+            new_rating = current_rating + adjusted_change
+        
+        return new_rating
+
 
     def online_elo_update(self, match_id: int, m : Match, results0 : Dict, results1 : Dict):
         index = 0
@@ -120,14 +138,27 @@ class ELO:
 
             # update Elo
             if sum(as_0) > sum(as_1):
-                self.score_0 = self.score_0 + self.k*(1 - expected_score_0)
-                self.score_1 = self.score_1 + self.k*(0 - expected_score_1)
+                if self.unbounded:
+                    self.score_0 = self.score_0 + self.k*(1 - expected_score_0)
+                    self.score_1 = self.score_1 + self.k*(0 - expected_score_1)
+                else:
+                    self.score_0 = max(self._soft_ceiling(self.score_0, self.k*(1 - expected_score_0)), RATING_FLOOR)
+                    self.score_1 = max(self._soft_ceiling(self.score_1, self.k*(0 - expected_score_1)), RATING_FLOOR)
             elif sum(as_1) > sum(as_0):
-                self.score_0 = self.score_0 + self.k*(0 - expected_score_0)
-                self.score_1 = self.score_1 + self.k*(1 - expected_score_1)
+                if self.unbounded:
+                    self.score_0 = self.score_0 + self.k*(0 - expected_score_0)
+                    self.score_1 = self.score_1 + self.k*(1 - expected_score_1)
+                else:
+                    self.score_0 = max(self._soft_ceiling(self.score_0, self.k*(0 - expected_score_0)), RATING_FLOOR)
+                    self.score_1 = max(self._soft_ceiling(self.score_1, self.k*(1 - expected_score_1)), RATING_FLOOR)
             elif sum(as_0) == sum(as_1):
-                self.score_0 = self.score_0 + self.k*(0.5 - expected_score_0)
-                self.score_1 = self.score_1 + self.k*(0.5 - expected_score_1)           
+                if self.unbounded:
+                    self.score_0 = self.score_0 + self.k*(0.5 - expected_score_0)
+                    self.score_1 = self.score_1 + self.k*(0.5 - expected_score_1)           
+                else:
+                    self.score_0 = max(self._soft_ceiling(self.score_0, self.k*(0.5 - expected_score_0)), RATING_FLOOR)
+                    self.score_1 = max(self._soft_ceiling(self.score_1, self.k*(0.5 - expected_score_1)), RATING_FLOOR)
+
             model0_old_elo = self.score_0
             model1_old_elo = self.score_1
 

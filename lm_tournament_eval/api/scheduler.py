@@ -84,6 +84,8 @@ class FileScheduler(Scheduler):
                 line_idxs = [int(idx) for idx in line_idxs]
                 self.idxs.append(line_idxs)
 
+        self.original_match_size = len(self.idxs)
+
     def __next__(self):
         if self.current_idx >= len(self.idxs):
             raise StopIteration

@@ -169,13 +169,14 @@ def create_requests(lm, task, limit,
 # task algebra code.
 
 def create_subtask(input_task : Task, schedule : List[int]) -> Task:
-
     subtask = deepcopy(input_task)
-
-    for key in subtask.dataset.keys():
-        if key not in [subtask.config.validation_split, subtask.config.test_split]:
-            continue
-        subtask.dataset[key] = subtask.dataset[key].select(schedule)
     
+    if input_task.has_test_docs():
+        key = input_task.config.test_split
+    elif input_task.has_validation_docs():
+        key = input_task.config.validation_split
+
+    subtask.dataset[key] = subtask.dataset[key].select(schedule)
+
     return subtask
 

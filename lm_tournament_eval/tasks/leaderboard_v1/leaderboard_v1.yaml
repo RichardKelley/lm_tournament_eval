@@ -1,0 +1,8 @@
+group: leaderboard_v1
+task:
+  - leaderboard_v1_arc
+  - leaderboard_v1_hellaswag
+  - leaderboard_v1_mmlu
+  - leaderboard_v1_truthfulqa
+  - leaderboard_v1_winogrande
+  - leaderboard_v1_gsm8k
