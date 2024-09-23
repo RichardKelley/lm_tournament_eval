@@ -25,6 +25,8 @@ from lm_tournament_eval.loggers import EvaluationTracker
 from lm_tournament_eval.evaluator_utils import get_task_groups
 from lm_tournament_eval.api.elo import ELO
 from lm_tournament_eval.api.bt import BradleyTerryModel
+from lm_tournament_eval.api.glicko import GlickoSystem
+
 from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
 from lm_tournament_eval.api.scheduler import FileScheduler, SamplingScheduler
@@ -128,7 +130,10 @@ class Tournament:
             self.bt = BradleyTerryModel(self.model0_key, 
                                         self.model1_key, 
                                         self.db)       
-
+        if self.config.ranking_system == "glicko":
+            self.glicko = GlickoSystem(self.model0_key, 
+                                       self.model1_key, 
+                                       self.db)   
     def tournament_evaluate(
         self,
         model: str,
@@ -355,4 +360,13 @@ class Tournament:
                                 wandb.log({
                                     str(self.model0_key) : self.bt.score_0,
                                     str(self.model1_key) : self.bt.score_1,                            
+                                })
+                        elif self.config.ranking_system == "glicko":
+                            self.glicko.create_results(results0, results1, self.config.task_names, self.config.match_size)
+                            self.db.set_model_score(*self.model0_key, self.glicko.score_0)
+                            self.db.set_model_score(*self.model1_key, self.glicko.score_1)
+                            if self.config.use_wandb:
+                                wandb.log({
+                                    str(self.model0_key) : self.glicko.score_0,
+                                    str(self.model1_key) : self.glicko.score_1,                            
                                 })
