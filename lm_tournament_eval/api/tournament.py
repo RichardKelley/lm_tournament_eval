@@ -26,6 +26,7 @@ from lm_tournament_eval.evaluator_utils import get_task_groups
 from lm_tournament_eval.api.elo import ELO
 from lm_tournament_eval.api.bt import BradleyTerryModel
 from lm_tournament_eval.api.glicko import GlickoSystem
+from lm_tournament_eval.api.trueskill import CustomTrueSkill
 
 from lm_tournament_eval.models.huggingface_model import HFLM
 from lm_tournament_eval.api.match import MatchResult
@@ -133,7 +134,9 @@ class Tournament:
         if self.config.ranking_system == "glicko":
             self.glicko = GlickoSystem(self.model0_key, 
                                        self.model1_key, 
-                                       self.db)   
+                                       self.db)
+        if self.config.ranking_system == "trueskill":
+            self.ts = CustomTrueSkill()
     def tournament_evaluate(
         self,
         model: str,
@@ -369,4 +372,13 @@ class Tournament:
                                 wandb.log({
                                     str(self.model0_key) : self.glicko.score_0,
                                     str(self.model1_key) : self.glicko.score_1,                            
+                                })
+                        elif self.config.ranking_system == "trueskill":
+                            self.ts.create_results(results0, results1, self.config.task_names, self.config.match_size)
+                            self.db.set_model_score(*self.model0_key, self.ts.score_0)
+                            self.db.set_model_score(*self.model1_key, self.ts.score_1)
+                            if self.config.use_wandb:
+                                wandb.log({
+                                    str(self.model0_key) : self.ts.score_0,
+                                    str(self.model1_key) : self.ts.score_1,                            
                                 })
