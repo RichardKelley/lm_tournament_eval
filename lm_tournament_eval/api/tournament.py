@@ -348,7 +348,7 @@ class Tournament:
                                     str(self.model1_key) : self.elo.score_1,                            
                                 })
                         elif self.config.ranking_system == "bt":
-                            self.bt.create_results(results0, results1, self.config.task_names, self.config.match_size)
+                            self.bt.create_results(match_id=match_id, m=m, results0=results0, results1=results1)
                             self.db.set_model_score(*self.model0_key, self.bt.score_0)
                             self.db.set_model_score(*self.model1_key, self.bt.score_1)
                             if self.config.use_wandb:
@@ -357,7 +357,7 @@ class Tournament:
                                     str(self.model1_key) : self.bt.score_1,                            
                                 })
                         elif self.config.ranking_system == "glicko":
-                            self.glicko.create_results(results0, results1, self.config.task_names, self.config.match_size)
+                            self.glicko.create_results(match_id=match_id, m=m, results0=results0, results1=results1)
                             self.db.set_model_score(*self.model0_key, self.glicko.score_0, self.glicko.rd_0, self.glicko.vol_0)
                             self.db.set_model_score(*self.model1_key, self.glicko.score_1, self.glicko.rd_1, self.glicko.vol_1)
                             if self.config.use_wandb:
@@ -366,7 +366,7 @@ class Tournament:
                                     str(self.model1_key) : self.glicko.score_1,                            
                                 })
                         elif self.config.ranking_system == "trueskill":
-                            self.ts.create_results(results0, results1, self.config.task_names, self.config.match_size)
+                            self.ts.create_results(match_id=match_id, m=m, results0=results0, results1=results1)
                             self.db.set_model_score(*self.model0_key, self.ts.score_0, self.ts.sigma_0)
                             self.db.set_model_score(*self.model1_key, self.ts.score_1, self.ts.sigma_1)
                             if self.config.use_wandb:

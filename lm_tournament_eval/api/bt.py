@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.optimize import minimize
 from lm_tournament_eval.score_database import ScoreDatabase
+from lm_tournament_eval.api.match import Match
+from typing import Dict
 
 class BradleyTerryModel:
     def __init__(self, model0_key, model1_key, db: ScoreDatabase, scale_factor=400):
@@ -66,50 +68,83 @@ class BradleyTerryModel:
         else:
             print("No results to fit. Keeping initial strengths.")
 
-    def create_results(self, results0, results1, task_names, match_size):
-        print(f"Initial scores: {self.model0_key}: {self.strengths[0]:.2f}, {self.model1_key}: {self.strengths[1]:.2f}")
+    def create_results(self, match_id: int, m : Match, results0 : Dict, results1 : Dict):
+        index = 0
+        print(f"initial values: score_0: {self.score_0} score_1, {self.score_1}")
         print("----------------------------")
-        index = 0 
-        for task_name in task_names:
-            task_results0 = results0["samples"][task_name]
-            task_results1 = results1["samples"][task_name]
-            
-            for i in range(0, len(task_results0), match_size):
-                answers0 = []
-                answers1 = []
+        answers0 = []
+        answers1 = []
+
+        for i in range(0, len(results0["samples"][m.task]), m.match_size):
+            match m.output_type:
+                case 'generate_until':
+                    for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
+                        if result0['exact_match'] == 1.0:
+                            answers0.append(1)
+                        else:
+                            answers0.append(0)
+                        if result1['exact_match'] == 1.0:
+                            answers1.append(1)
+                        else:
+                            answers1.append(0)
+                case 'loglikelihood' | "multiple_choice":
+                    for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
+                        if "acc_norm" in result0.keys():
+                            if result0["acc_norm"] == 1.0:
+                                answers0.append(1)
+                            else:
+                                answers0.append(0)
+                        elif "acc" in result0.keys():
+                            if result0["acc"] == 1.0:
+                                answers0.append(1)
+                            else:
+                                answers0.append(0)
+
+                        if "acc_norm" in result1.keys():
+                            if result1["acc_norm"] == 1.0:
+                                answers1.append(1)
+                            else:
+                                answers1.append(0)
+                        elif "acc" in result1.keys():
+                            if result1["acc"] == 1.0:
+                                answers1.append(1)
+                            else:
+                                answers1.append(0)
+
+            # calculate the wins, losses, and draws
+            as_0 = []
+            as_1 = []
+            winners = []
+
+            for i in range(len(answers0)):
+                # draw
+                if answers0[i] == answers1[i]:
+                    as_0.append(0)
+                    as_1.append(0)
+                    winners.append("draw")
+                # model 0 won 
+                elif answers0[i] > answers1[i]:
+                    as_0.append(1)
+                    as_1.append(0)
+                    winners.append("model0")
+                # model 1 won
+                elif answers0[i] < answers1[i]:
+                    as_0.append(0)
+                    as_1.append(1)
+                    winners.append("model1")
+
+            self.db.record_instance_updates(match=m, 
+                                            match_id=match_id, 
+                                            samples0=results0["samples"][m.task],
+                                            samples1=results1["samples"][m.task],
+                                            elo_0=self.score_0,
+                                            elo_1=self.score_1,
+                                            winners=winners)
                 
-                batch = task_results0[i:i+match_size]
-                for j, (result0, result1) in enumerate(zip(batch, task_results1[i:i+match_size])):
-                    if results0['configs'][task_name]['output_type'] == 'generate_until':
-                        answers0.append(1 if result0['exact_match'] == 1.0 else 0)
-                        answers1.append(1 if result1['exact_match'] == 1.0 else 0)
-                    else:
-                        if "acc_norm" in result0:
-                            answers0.append(1 if result0["acc_norm"] == 1.0 else 0)
-                            answers1.append(1 if result1["acc_norm"] == 1.0 else 0)
-                        elif "acc" in result0:
-                            answers0.append(1 if result0["acc"] == 1.0 else 0)
-                            answers1.append(1 if result1["acc"] == 1.0 else 0)
-                
-                # Calculate the outcome for this batch
-                sum0 = sum(answers0)
-                sum1 = sum(answers1)
-                if sum0 > sum1:
-                    self.add_result(1)  # model0 won
-                    outcome = "Model0 won"
-                elif sum0 < sum1:
-                    self.add_result(0)  # model1 won
-                    outcome = "Model1 won"
-                else:
-                    self.add_result(0.5)  # draw
-                    outcome = "Draw"
-                
-                # Fit the model after each batch
-                old_strengths = self.strengths.copy()
-                self.fit()
-        
-                self.score_0 = self.strengths[0]
-                self.score_1 = self.strengths[1]
-                index += 1 
-                print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
-                print("----------------------------")
+            # Fit the model after each batch
+            self.fit()    
+            self.score_0 = self.strengths[0]
+            self.score_1 = self.strengths[1]
+            index += 1 
+            print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
+            print("----------------------------")

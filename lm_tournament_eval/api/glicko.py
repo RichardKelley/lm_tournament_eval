@@ -1,6 +1,7 @@
 import math
 from lm_tournament_eval.score_database import ScoreDatabase
-
+from lm_tournament_eval.api.match import Match
+from typing import Dict
 
 class GlickoSystem:
     def __init__(self, model0_key, model1_key, db : ScoreDatabase, tau=0.5, initial_rd=350, initial_vol=0.06, floor=100, ceiling=3000, decay_factor=0.1):
@@ -118,69 +119,83 @@ class GlickoSystem:
             self.score_1, self.rd_1, self.vol_1 = self.update_player(self.score_1, self.rd_1, self.vol_1, self.score_0, self.rd_0, 0.5)
 
 
-    def create_results(self, results0, results1, task_names, match_size):
+    def create_results(self, match_id: int, m : Match, results0 : Dict, results1 : Dict):
         index = 0
-        print(f"match {index} : score_0, rd, vol: {self.score_0}, {self.rd_0}, {self.vol_0}")
-        print(f"match {index} : score_1, rd, vol: {self.score_1}, {self.rd_1}, {self.vol_1}")
+        print(f"initial values: score_0, rd, vol: {self.score_0}, {self.rd_0}, {self.vol_0}")
+        print(f"initial values: score_1, rd, vol: {self.score_1}, {self.rd_1}, {self.vol_1}")
         print("----------------------------")
-        answers0 = {}
-        answers1 = {}
-        for task_name in task_names:
-            for i in range(0, len(results0["samples"][task_name]), match_size):
-                answers0[task_name] = []
-                answers1[task_name] = []
-                if results0['configs'][task_name]['output_type'] == 'generate_until':
-                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+        answers0 = []
+        answers1 = []
+
+        for i in range(0, len(results0["samples"][m.task]), m.match_size):
+            match m.output_type:
+                case 'generate_until':
+                    for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
                         if result0['exact_match'] == 1.0:
-                            answers0[task_name].append(1)
+                            answers0.append(1)
                         else:
-                            answers0[task_name].append(0)
+                            answers0.append(0)
                         if result1['exact_match'] == 1.0:
-                            answers1[task_name].append(1)
+                            answers1.append(1)
                         else:
-                            answers1[task_name].append(0)
-                else:    
-                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
+                            answers1.append(0)
+                case 'loglikelihood' | "multiple_choice":
+                    for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
                         if "acc_norm" in result0.keys():
                             if result0["acc_norm"] == 1.0:
-                                answers0[task_name].append(1)
+                                answers0.append(1)
                             else:
-                                answers0[task_name].append(0)
+                                answers0.append(0)
                         elif "acc" in result0.keys():
                             if result0["acc"] == 1.0:
-                                answers0[task_name].append(1)
+                                answers0.append(1)
                             else:
-                                answers0[task_name].append(0)
+                                answers0.append(0)
+
                         if "acc_norm" in result1.keys():
                             if result1["acc_norm"] == 1.0:
-                                answers1[task_name].append(1)
+                                answers1.append(1)
                             else:
-                                answers1[task_name].append(0)
+                                answers1.append(0)
                         elif "acc" in result1.keys():
                             if result1["acc"] == 1.0:
-                                answers1[task_name].append(1)
+                                answers1.append(1)
                             else:
-                                answers1[task_name].append(0)
-                # calculate the wins, losses, and draws
-                as_0 = []
-                as_1 = []
+                                answers1.append(0)
 
-                for i in range(len(answers0[task_name])):
-                    # draw
-                    if answers0[task_name][i] == answers1[task_name][i]:
-                        as_0.append(0)
-                        as_1.append(0)
-                    # model 1 won 
-                    elif answers0[task_name][i] > answers1[task_name][i]:
-                        as_0.append(1)
-                        as_1.append(0)
-                    # model 2 won
-                    elif answers0[task_name][i] < answers1[task_name][i]:
-                        as_0.append(0)
-                        as_1.append(1)
+            # calculate the wins, losses, and draws
+            as_0 = []
+            as_1 = []
+            winners = []
 
-                self.set_results(as_0, as_1)
-                index += 1
-                print(f"match {index} : score_0, rd, vol: {self.score_0}, {self.rd_0}, {self.vol_0}")
-                print(f"match {index} : score_1, rd, vol: {self.score_1}, {self.rd_1}, {self.vol_1}")
-                print("----------------------------")
+            for i in range(len(answers0)):
+                # draw
+                if answers0[i] == answers1[i]:
+                    as_0.append(0)
+                    as_1.append(0)
+                    winners.append("draw")
+                # model 0 won 
+                elif answers0[i] > answers1[i]:
+                    as_0.append(1)
+                    as_1.append(0)
+                    winners.append("model0")
+                # model 1 won
+                elif answers0[i] < answers1[i]:
+                    as_0.append(0)
+                    as_1.append(1)
+                    winners.append("model1")
+
+            self.db.record_instance_updates(match=m, 
+                                            match_id=match_id, 
+                                            samples0=results0["samples"][m.task],
+                                            samples1=results1["samples"][m.task],
+                                            elo_0=self.score_0,
+                                            elo_1=self.score_1,
+                                            winners=winners)
+
+
+            self.set_results(as_0, as_1)
+            index += 1
+            print(f"match {index} : score_0, rd, vol: {self.score_0}, {self.rd_0}, {self.vol_0}")
+            print(f"match {index} : score_1, rd, vol: {self.score_1}, {self.rd_1}, {self.vol_1}")
+            print("----------------------------")
