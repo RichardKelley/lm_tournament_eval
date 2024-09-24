@@ -10,7 +10,7 @@ def argmax(iterable):
     return max(enumerate(iterable), key=lambda x: x[1])[0]
 
 MAX_SCORE_DIFF = 800
-RATING_FLOOR = 1100
+RATING_FLOOR = 100
 
 class ELO:
     def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True):
@@ -31,7 +31,7 @@ class ELO:
             self.db.insert_model(*model1_key)
             self.score_1 = 1200.0
 
-        self.k = 16
+        self.k = 10
         self.soft_ceiling=3000
         self.decay_factor=0.01
 
@@ -74,18 +74,27 @@ class ELO:
                             answers1.append(0)
                 case 'loglikelihood' | "multiple_choice":
                     for result0, result1 in zip(results0["samples"][m.task][i:i+m.match_size], results1["samples"][m.task][i:i+m.match_size]):
-                        nll0 = [response[0][0] for response in result0["resps"]]
-                        nll1 = [response[0][0] for response in result1["resps"]]
-                        prediction0 = argmax(nll0)
-                        prediction1 = argmax(nll1)
-                        if prediction0 == result0["target"]:
-                            answers0.append(1)
-                        else:
-                            answers0.append(0)
-                        if prediction1 == result1["target"]:
-                            answers1.append(1)
-                        else:
-                            answers1.append(0)
+                        if "acc_norm" in result0.keys():
+                            if result0["acc_norm"] == 1.0:
+                                answers0.append(1)
+                            else:
+                                answers0.append(0)
+                        elif "acc" in result0.keys():
+                            if result0["acc"] == 1.0:
+                                answers0.append(1)
+                            else:
+                                answers0.append(0)
+
+                        if "acc_norm" in result1.keys():
+                            if result1["acc_norm"] == 1.0:
+                                answers1.append(1)
+                            else:
+                                answers1.append(0)
+                        elif "acc" in result1.keys():
+                            if result1["acc"] == 1.0:
+                                answers1.append(1)
+                            else:
+                                answers1.append(0)
                 case 'loglikelihood_rolling':
                     # TODO check this logic on a real task...
                     for result0, result1 in zip(results0["samples"][m.task][i:i+m.match], results1["samples"][m.task][i:i+m.match_size]):
