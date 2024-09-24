@@ -2,37 +2,32 @@ import numpy as np
 from scipy.optimize import minimize
 from lm_tournament_eval.score_database import ScoreDatabase
 
-def argmax(iterable):
-    return max(enumerate(iterable), key=lambda x: x[1])[0]
-
 class BradleyTerryModel:
-    def __init__(self, model0_key, model1_key, db : ScoreDatabase, scale_factor=400):
+    def __init__(self, model0_key, model1_key, db: ScoreDatabase, scale_factor=400):
         self.scale_factor = scale_factor
         self.db = db
+        self.soft_ceiling = 3000
+        self.hard_floor = 100
+        self.model0_key = model0_key
+        self.model1_key = model1_key
 
         if self.db.check_model_exists(*model0_key):
-            self.score_0 = self.db.get_model_score(*model0_key)
+            self.score_0, _, _ = self.db.get_model_score(*model0_key)
         else:
             self.db.insert_model(*model0_key)
             self.score_0 = 1200.0
         
         if self.db.check_model_exists(*model1_key):
-            self.score_1 = self.db.get_model_score(*model1_key)
+            self.score_1, _, _ = self.db.get_model_score(*model1_key)
         else:
             self.db.insert_model(*model1_key)
             self.score_1 = 1200.0
 
         self.strengths = np.array([self.score_0, self.score_1])
-
-    def set_results(self, answers0, answers1):
         self.results = []
-        for i in range(len(answers0)):
-            if answers0[i] == answers1[i]:
-                self.results.append((0, 1, 0.5))
-            if answers0[i] > answers1[i]:
-                self.results.append((0, 1, 1))
-            elif answers0[i] < answers1[i]:
-                self.results.append((0, 1, 0))
+
+    def add_result(self, outcome):
+        self.results.append((0, 1, outcome))
 
     def nll(self, strengths):
         nll = 0
@@ -45,75 +40,76 @@ class BradleyTerryModel:
             else:  # Draw
                 nll -= np.log(0.5)
         return nll
-    
+
+    def apply_constraints(self, strengths):
+        # Apply hard floor
+        strengths = np.maximum(strengths, self.hard_floor)
+        
+        # Apply soft ceiling
+        over_ceiling = strengths > self.soft_ceiling
+        strengths[over_ceiling] = self.soft_ceiling + (strengths[over_ceiling] - self.soft_ceiling) * 0.1
+        
+        return strengths
+
     def fit(self):
-        result = minimize(self.nll, self.strengths, method='BFGS')
-        self.strengths = result.x
+        if len(self.results) > 0:
+            result = minimize(self.nll, self.strengths, method='BFGS', options={'gtol': 1e-6, 'maxiter': 1000})
+            if not result.success:
+                print(f"Optimization failed: {result.message}")
+            new_strengths = self.apply_constraints(result.x)
+            # Ensure minimum change
+            min_change = 1.0
+            diff = new_strengths - self.strengths
+            mask = np.abs(diff) < min_change
+            diff[mask] = np.sign(diff[mask]) * min_change
+            self.strengths = self.strengths + diff
+        else:
+            print("No results to fit. Keeping initial strengths.")
 
     def create_results(self, results0, results1, task_names, match_size):
-        index = 0
-        print(f"match 0 : score_0, 1 {self.strengths[0]}, {self.strengths[1]}")
+        print(f"Initial scores: {self.model0_key}: {self.strengths[0]:.2f}, {self.model1_key}: {self.strengths[1]:.2f}")
         print("----------------------------")
-        answers0 = {}
-        answers1 = {}
+        index = 0 
         for task_name in task_names:
-            for i in range(0, len(results0["samples"][task_name]), match_size):
-                answers0[task_name] = []
-                answers1[task_name] = []
-                if results0['configs'][task_name]['output_type'] == 'generate_until':
-                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
-                        if result0['exact_match'] == 1.0:
-                            answers0[task_name].append(1)
-                        else:
-                            answers0[task_name].append(0)
-                        if result1['exact_match'] == 1.0:
-                            answers1[task_name].append(1)
-                        else:
-                            answers1[task_name].append(0)
-                else:    
-                    for result0, result1 in zip(results0["samples"][task_name][i:i+match_size], results1["samples"][task_name][i:i+match_size]):
-                        if "acc_norm" in result0.keys():
-                            if result0["acc_norm"] == 1.0:
-                                answers0[task_name].append(1)
-                            else:
-                                answers0[task_name].append(0)
-                        elif "acc" in result0.keys():
-                            if result0["acc"] == 1.0:
-                                answers0[task_name].append(1)
-                            else:
-                                answers0[task_name].append(0)
-                        if "acc_norm" in result1.keys():
-                            if result1["acc_norm"] == 1.0:
-                                answers1[task_name].append(1)
-                            else:
-                                answers1[task_name].append(0)
-                        elif "acc" in result1.keys():
-                            if result1["acc"] == 1.0:
-                                answers1[task_name].append(1)
-                            else:
-                                answers1[task_name].append(0)
-                # calculate the wins, losses, and draws
-                as_0 = []
-                as_1 = []
-
-                for i in range(len(answers0[task_name])):
-                    # draw
-                    if answers0[task_name][i] == answers1[task_name][i]:
-                        as_0.append(0)
-                        as_1.append(0)
-                    # model 1 won 
-                    elif answers0[task_name][i] > answers1[task_name][i]:
-                        as_0.append(1)
-                        as_1.append(0)
-                    # model 2 won
-                    elif answers0[task_name][i] < answers1[task_name][i]:
-                        as_0.append(0)
-                        as_1.append(1)
-
-                self.set_results(as_0, as_1)
+            task_results0 = results0["samples"][task_name]
+            task_results1 = results1["samples"][task_name]
+            
+            for i in range(0, len(task_results0), match_size):
+                answers0 = []
+                answers1 = []
+                
+                batch = task_results0[i:i+match_size]
+                for j, (result0, result1) in enumerate(zip(batch, task_results1[i:i+match_size])):
+                    if results0['configs'][task_name]['output_type'] == 'generate_until':
+                        answers0.append(1 if result0['exact_match'] == 1.0 else 0)
+                        answers1.append(1 if result1['exact_match'] == 1.0 else 0)
+                    else:
+                        if "acc_norm" in result0:
+                            answers0.append(1 if result0["acc_norm"] == 1.0 else 0)
+                            answers1.append(1 if result1["acc_norm"] == 1.0 else 0)
+                        elif "acc" in result0:
+                            answers0.append(1 if result0["acc"] == 1.0 else 0)
+                            answers1.append(1 if result1["acc"] == 1.0 else 0)
+                
+                # Calculate the outcome for this batch
+                sum0 = sum(answers0)
+                sum1 = sum(answers1)
+                if sum0 > sum1:
+                    self.add_result(1)  # model0 won
+                    outcome = "Model0 won"
+                elif sum0 < sum1:
+                    self.add_result(0)  # model1 won
+                    outcome = "Model1 won"
+                else:
+                    self.add_result(0.5)  # draw
+                    outcome = "Draw"
+                
+                # Fit the model after each batch
+                old_strengths = self.strengths.copy()
                 self.fit()
-                index += 1
-                print(f"match {index} : score_0, 1 {self.strengths[0]}, {self.strengths[1]}")
-                print("----------------------------")
+        
                 self.score_0 = self.strengths[0]
                 self.score_1 = self.strengths[1]
+                index += 1 
+                print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
+                print("----------------------------")

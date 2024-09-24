@@ -112,16 +112,6 @@ class Tournament:
 
         logging.info(f"model0 key = {self.model0_key}")
 
-        if not db.check_model_exists(*self.model0_key):
-            logging.info("Inserting model0 into DB")
-            self.db.insert_model(*self.model0_key)
-
-        if not db.check_model_exists(*self.model1_key):
-            self.db.insert_model(*self.model1_key)
-
-        elo_0 = db.get_model_score(*self.model0_key)
-        elo_1 = db.get_model_score(*self.model1_key)
-
         if self.config.ranking_system == "elo":
             self.elo = ELO(self.model0_key, 
                            self.model1_key, 
@@ -136,7 +126,9 @@ class Tournament:
                                        self.model1_key, 
                                        self.db)
         if self.config.ranking_system == "trueskill":
-            self.ts = CustomTrueSkill()
+            self.ts = CustomTrueSkill(self.model0_key, 
+                                       self.model1_key, 
+                                       self.db)
     def tournament_evaluate(
         self,
         model: str,
@@ -366,8 +358,8 @@ class Tournament:
                                 })
                         elif self.config.ranking_system == "glicko":
                             self.glicko.create_results(results0, results1, self.config.task_names, self.config.match_size)
-                            self.db.set_model_score(*self.model0_key, self.glicko.score_0)
-                            self.db.set_model_score(*self.model1_key, self.glicko.score_1)
+                            self.db.set_model_score(*self.model0_key, self.glicko.score_0, self.glicko.rd_0, self.glicko.vol_0)
+                            self.db.set_model_score(*self.model1_key, self.glicko.score_1, self.glicko.rd_1, self.glicko.vol_1)
                             if self.config.use_wandb:
                                 wandb.log({
                                     str(self.model0_key) : self.glicko.score_0,
@@ -375,8 +367,8 @@ class Tournament:
                                 })
                         elif self.config.ranking_system == "trueskill":
                             self.ts.create_results(results0, results1, self.config.task_names, self.config.match_size)
-                            self.db.set_model_score(*self.model0_key, self.ts.score_0)
-                            self.db.set_model_score(*self.model1_key, self.ts.score_1)
+                            self.db.set_model_score(*self.model0_key, self.ts.score_0, self.ts.sigma_0)
+                            self.db.set_model_score(*self.model1_key, self.ts.score_1, self.ts.sigma_1)
                             if self.config.use_wandb:
                                 wandb.log({
                                     str(self.model0_key) : self.ts.score_0,

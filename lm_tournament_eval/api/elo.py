@@ -20,13 +20,13 @@ class ELO:
         self.unbounded = unbounded
 
         if self.db.check_model_exists(*model0_key):
-            self.score_0 = self.db.get_model_score(*model0_key)
+            self.score_0, _, _ = self.db.get_model_score(*model0_key)
         else:
             self.db.insert_model(*model0_key)
             self.score_0 = 1200.0
         
         if self.db.check_model_exists(*model1_key):
-            self.score_1 = self.db.get_model_score(*model1_key)
+            self.score_1, _, _ = self.db.get_model_score(*model1_key)
         else:
             self.db.insert_model(*model1_key)
             self.score_1 = 1200.0

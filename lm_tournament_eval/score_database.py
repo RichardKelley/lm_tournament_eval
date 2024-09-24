@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS MODEL (
     quantization_level TEXT NOT NULL,
     model_args TEXT NOT NULL,
     score REAL NOT NULL DEFAULT 0.0,
+    rd REAL NOT NULL DEFAULT 0.0,
+    vol REAL NOT NULL DEFAULT 0.0,
     PRIMARY KEY (model_name, quantization_level, model_args)
 );
 """
@@ -194,14 +196,14 @@ class ScoreDatabase:
             print(f"An error occurred: {e}")
             return False
         
-    def insert_model(self, model, quantization, model_args, score=1200):
+    def insert_model(self, model, quantization, model_args, score=1200, rd=0.0, vol=0.0):
         try:
             if model_args is None:
                 model_args = "None"
             self.cursor.execute("""
-            INSERT INTO MODEL (model_name, quantization_level, model_args, score)
-            VALUES (?, ?, ?, ?)
-            """, (model, quantization, model_args, score))
+            INSERT INTO MODEL (model_name, quantization_level, model_args, score, rd, vol)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (model, quantization, model_args, score, rd, vol))
             
             self.database.commit()
             print(f"Model {model} with quantization level {quantization} inserted successfully.")
@@ -221,24 +223,23 @@ class ScoreDatabase:
     def get_model_score(self, name, quantization_level, model_args):
         try:
             self.cursor.execute("""
-            SELECT score FROM MODEL 
+            SELECT score, rd, vol FROM MODEL 
             WHERE model_name = ? AND quantization_level = ? AND model_args = ?
             """, (name, quantization_level, model_args))
-            
             result = self.cursor.fetchone()
-            return result[0] if result else None
+            return result if result else None
         
         except sqlite3.Error as e:
             print(f"An error occurred: {e}")
             return None
 
-    def set_model_score(self, name, quantization_level, model_args, new_score):
+    def set_model_score(self, name, quantization_level, model_args, new_score, new_rd=0.0, new_vol=0.0):
         try:
             self.cursor.execute("""
             UPDATE MODEL 
-            SET score = ? 
+            SET score = ?, rd = ?, vol = ? 
             WHERE model_name = ? AND quantization_level = ? AND model_args = ?
-            """, (new_score, name, quantization_level, model_args))
+            """, (new_score, new_rd, new_vol, name, quantization_level, model_args))
             
             if self.cursor.rowcount == 0:
                 print(f"Model {name} with quantization level {quantization_level} not found.")

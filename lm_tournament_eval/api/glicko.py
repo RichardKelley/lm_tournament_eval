@@ -8,22 +8,22 @@ class GlickoSystem:
         self.db = db
 
         if self.db.check_model_exists(*model0_key):
-            self.score_0 = self.db.get_model_score(*model0_key)
+            self.score_0, self.rd_0, self.vol_0 = self.db.get_model_score(*model0_key)
         else:
             self.db.insert_model(*model0_key)
             self.score_0 = 1200.0
-        
+            self.rd_0 = initial_rd
+            self.vol_0 = initial_vol
+
         if self.db.check_model_exists(*model1_key):
-            self.score_1 = self.db.get_model_score(*model1_key)
+            self.score_1, self.rd_1, self.vol_1 = self.db.get_model_score(*model1_key)
         else:
             self.db.insert_model(*model1_key)
             self.score_1 = 1200.0
+            self.rd_1 = initial_rd
+            self.vol_1 = initial_vol
 
         self.initial_rating = 1200.0
-        self.rd_0 = initial_rd
-        self.rd_1 = initial_rd
-        self.vol_0 = initial_vol
-        self.vol_1 = initial_vol
         self.floor = floor
         self.ceiling = ceiling
         self.decay_factor = decay_factor
@@ -120,7 +120,8 @@ class GlickoSystem:
 
     def create_results(self, results0, results1, task_names, match_size):
         index = 0
-        print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
+        print(f"match {index} : score_0, rd, vol: {self.score_0}, {self.rd_0}, {self.vol_0}")
+        print(f"match {index} : score_1, rd, vol: {self.score_1}, {self.rd_1}, {self.vol_1}")
         print("----------------------------")
         answers0 = {}
         answers1 = {}
@@ -180,5 +181,6 @@ class GlickoSystem:
 
                 self.set_results(as_0, as_1)
                 index += 1
-                print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
+                print(f"match {index} : score_0, rd, vol: {self.score_0}, {self.rd_0}, {self.vol_0}")
+                print(f"match {index} : score_1, rd, vol: {self.score_1}, {self.rd_1}, {self.vol_1}")
                 print("----------------------------")

@@ -1,8 +1,9 @@
 import math
 from typing import Tuple
+from lm_tournament_eval.score_database import ScoreDatabase
 
 class CustomTrueSkill:
-    def __init__(self, mu: float = 1200, sigma: float = 400 / 3, beta: float = 200, tau: float = 5, draw_probability: float = 0.1):
+    def __init__(self, model0_key, model1_key, db : ScoreDatabase, mu: float = 1200, sigma: float = 400 / 3, beta: float = 200, tau: float = 5, draw_probability: float = 0.1):
         self.mu = mu
         self.sigma = sigma
         self.beta = beta
@@ -11,15 +12,25 @@ class CustomTrueSkill:
         self.soft_ceiling = 3000
         self.decay_factor = 0.1  # Adjust this to control the strength of the soft ceiling
         self.draw_probability = draw_probability
+        self.db = db
 
-        self.rating_0 = self.create_rating()
-        self.rating_1 = self.create_rating()
-
-        self.score_0 = self.rating_0[0]
-        self.score_1 = self.rating_1[0]
-
-    def create_rating(self) -> Tuple[float, float]:
-        return (self.mu, self.sigma)
+        if self.db.check_model_exists(*model0_key):
+            self.score_0, self.sigma_0, _ = self.db.get_model_score(*model0_key)
+            self.rating_0 = (self.score_0, self.sigma_0)
+        else:
+            self.db.insert_model(*model0_key)
+            self.score_0 = self.mu
+            self.sigma_0 = self.sigma
+            self.rating_0 = (self.score_0, self.sigma_0)
+        
+        if self.db.check_model_exists(*model1_key):
+            self.score_1, self.sigma_1, _ = self.db.get_model_score(*model1_key)
+            self.rating_1 = (self.score_1, self.sigma_1)
+        else:
+            self.db.insert_model(*model1_key)
+            self.score_1 = self.mu
+            self.sigma_1 = self.sigma
+            self.rating_1 = (self.score_1, self.sigma_1)
 
     def update_rating(self, winner: Tuple[float, float], loser: Tuple[float, float]) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         winner_mu, winner_sigma = winner
@@ -110,7 +121,7 @@ class CustomTrueSkill:
 
     def create_results(self, results0, results1, task_names, match_size):
         index = 0
-        print(f"match 0 : score_0, 1 {self.score_0}, {self.score_1}")
+        print(f"match {index} : score_0, sigma_0: {self.score_0},{self.sigma_0} score_1, sigma_1: {self.score_1}, {self.sigma_1}")
         print("----------------------------")
         answers0 = {}
         answers1 = {}
@@ -175,9 +186,9 @@ class CustomTrueSkill:
             elif sum(as_0) == sum(as_1):
                 self.rating_0, self.rating_1 = self.update_rating_draw(self.rating_0, self.rating_1)
 
-            self.score_0 = self.rating_0[0]
-            self.score_1 = self.rating_1[0]
+            self.score_0, self.sigma_0 = self.rating_0
+            self.score_1, self.sigma_1 = self.rating_1
             index += 1
-            print(f"match {index} : score_0, 1 {self.score_0}, {self.score_1}")
+            print(f"match {index} : score_0, sigma_0: {self.score_0},{self.sigma_0} score_1, sigma_1: {self.score_1}, {self.sigma_1}")
             print("----------------------------")
         
