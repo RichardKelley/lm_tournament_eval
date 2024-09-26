@@ -5,7 +5,7 @@ from lm_tournament_eval.api.match import Match
 from typing import Dict
 
 class BradleyTerryModel:
-    def __init__(self, model0_key, model1_key, db: ScoreDatabase, scale_factor=400):
+    def __init__(self, model0_key, model1_key, db: ScoreDatabase, scale_factor=10):
         self.scale_factor = scale_factor
         self.db = db
         self.soft_ceiling = 3000
@@ -28,8 +28,13 @@ class BradleyTerryModel:
         self.strengths = np.array([self.score_0, self.score_1])
         self.results = []
 
-    def add_result(self, outcome):
-        self.results.append((0, 1, outcome))
+    def set_results(self, answers0, answers1):
+        if sum(answers0) == sum(answers1):
+            self.results.append((0, 1, 0.5))
+        if sum(answers0) > sum(answers1):
+            self.results.append((0, 1, 1))
+        elif sum(answers0) < sum(answers1):
+            self.results.append((0, 1, 0))
 
     def nll(self, strengths):
         nll = 0
@@ -115,7 +120,6 @@ class BradleyTerryModel:
             as_0 = []
             as_1 = []
             winners = []
-
             for i in range(len(answers0)):
                 # draw
                 if answers0[i] == answers1[i]:
@@ -142,6 +146,7 @@ class BradleyTerryModel:
                                             winners=winners)
                 
             # Fit the model after each batch
+            self.set_results(as_0, as_1)
             self.fit()    
             self.score_0 = self.strengths[0]
             self.score_1 = self.strengths[1]
