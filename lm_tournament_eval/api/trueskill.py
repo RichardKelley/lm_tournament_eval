@@ -15,24 +15,26 @@ class CustomTrueSkill:
         self.decay_factor = 0.1  # Adjust this to control the strength of the soft ceiling
         self.draw_probability = draw_probability
         self.db = db
+        self.rank = int(os.environ.get('LOCAL_RANK',-1))
 
-        if self.db.check_model_exists(*model0_key):
-            self.score_0, self.sigma_0, _ = self.db.get_model_score(*model0_key)
-            self.rating_0 = (self.score_0, self.sigma_0)
-        else:
-            self.db.insert_model(*model0_key)
-            self.score_0 = self.mu
-            self.sigma_0 = self.sigma
-            self.rating_0 = (self.score_0, self.sigma_0)
-        
-        if self.db.check_model_exists(*model1_key):
-            self.score_1, self.sigma_1, _ = self.db.get_model_score(*model1_key)
-            self.rating_1 = (self.score_1, self.sigma_1)
-        else:
-            self.db.insert_model(*model1_key)
-            self.score_1 = self.mu
-            self.sigma_1 = self.sigma
-            self.rating_1 = (self.score_1, self.sigma_1)
+        if self.rank == 0 or self.rank == -1:
+            if self.db.check_model_exists(*model0_key):
+                self.score_0, self.sigma_0, _ = self.db.get_model_score(*model0_key)
+                self.rating_0 = (self.score_0, self.sigma_0)
+            else:
+                self.db.insert_model(*model0_key)
+                self.score_0 = self.mu
+                self.sigma_0 = self.sigma
+                self.rating_0 = (self.score_0, self.sigma_0)
+            
+            if self.db.check_model_exists(*model1_key):
+                self.score_1, self.sigma_1, _ = self.db.get_model_score(*model1_key)
+                self.rating_1 = (self.score_1, self.sigma_1)
+            else:
+                self.db.insert_model(*model1_key)
+                self.score_1 = self.mu
+                self.sigma_1 = self.sigma
+                self.rating_1 = (self.score_1, self.sigma_1)
 
     def update_rating(self, winner: Tuple[float, float], loser: Tuple[float, float]) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         winner_mu, winner_sigma = winner

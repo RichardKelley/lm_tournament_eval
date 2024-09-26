@@ -7,22 +7,24 @@ class GlickoSystem:
     def __init__(self, model0_key, model1_key, db : ScoreDatabase, tau=0.5, initial_rd=350, initial_vol=0.06, floor=100, ceiling=3000, decay_factor=0.1):
         self.tau = tau
         self.db = db
+        self.rank = int(os.environ.get('LOCAL_RANK',-1))
 
-        if self.db.check_model_exists(*model0_key):
-            self.score_0, self.rd_0, self.vol_0 = self.db.get_model_score(*model0_key)
-        else:
-            self.db.insert_model(*model0_key)
-            self.score_0 = 1200.0
-            self.rd_0 = initial_rd
-            self.vol_0 = initial_vol
+        if self.rank == 0 or self.rank == -1:
+            if self.db.check_model_exists(*model0_key):
+                self.score_0, self.rd_0, self.vol_0 = self.db.get_model_score(*model0_key)
+            else:
+                self.db.insert_model(*model0_key)
+                self.score_0 = 1200.0
+                self.rd_0 = initial_rd
+                self.vol_0 = initial_vol
 
-        if self.db.check_model_exists(*model1_key):
-            self.score_1, self.rd_1, self.vol_1 = self.db.get_model_score(*model1_key)
-        else:
-            self.db.insert_model(*model1_key)
-            self.score_1 = 1200.0
-            self.rd_1 = initial_rd
-            self.vol_1 = initial_vol
+            if self.db.check_model_exists(*model1_key):
+                self.score_1, self.rd_1, self.vol_1 = self.db.get_model_score(*model1_key)
+            else:
+                self.db.insert_model(*model1_key)
+                self.score_1 = 1200.0
+                self.rd_1 = initial_rd
+                self.vol_1 = initial_vol
 
         self.initial_rating = 1200.0
         self.floor = floor
