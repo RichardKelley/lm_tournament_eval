@@ -1,3 +1,4 @@
+import os
 import math
 from typing import Tuple
 from lm_tournament_eval.score_database import ScoreDatabase
@@ -34,7 +35,7 @@ class CustomTrueSkill:
             self.sigma_1 = self.sigma
             self.rating_1 = (self.score_1, self.sigma_1)
 
-    def update_rating(self, winner: Tuple[float, float], loser: Tuple[float, float]) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+    def update_rating_win_loss(self, winner: Tuple[float, float], loser: Tuple[float, float]) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         winner_mu, winner_sigma = winner
         loser_mu, loser_sigma = loser
 
@@ -83,10 +84,10 @@ class CustomTrueSkill:
         return (mu1_new, sigma1_new), (mu2_new, sigma2_new)
 
     def v_win(self, winner_mu: float, loser_mu: float, c: float) -> float:
-        return self.v(winner_mu - loser_mu, c)
+        return self.v((winner_mu - loser_mu) / c)
 
     def w_win(self, winner_mu: float, loser_mu: float, c: float) -> float:
-        return self.w(winner_mu - loser_mu, c)
+        return self.w((winner_mu - loser_mu) / c)
 
     def v_draw(self, mu1: float, mu2: float, c: float) -> float:
         return self.v((mu1 - mu2) / c) * 2 * self.draw_probability
@@ -94,13 +95,11 @@ class CustomTrueSkill:
     def w_draw(self, mu1: float, mu2: float, c: float) -> float:
         return self.w((mu1 - mu2) / c) * 2 * self.draw_probability
 
-    def v(self, t: float, c: float) -> float:
-        x = t / c
+    def v(self, x: float) -> float:
         return self.pdf(x) / self.cdf(x)
 
-    def w(self, t: float, c: float) -> float:
-        x = t / c
-        v = self.v(t, c)
+    def w(self, x: float) -> float:
+        v = self.v(x)
         return v * (v + x)
 
     def pdf(self, x: float) -> float:
@@ -119,7 +118,6 @@ class CustomTrueSkill:
     def dynamic_update_factor(self, rating: float) -> float:
         # Slower updates near the ceiling, faster updates near the floor
         return 1 - (rating - self.hard_floor) / (self.soft_ceiling - self.hard_floor)
-    
 
     def create_results(self, match_id: int, m : Match, results0 : Dict, results1 : Dict):
         index = 0
@@ -195,10 +193,13 @@ class CustomTrueSkill:
                                             winners=winners)
 
             if sum(as_0) > sum(as_1):
-                self.rating_0, self.rating_1 = self.update_rating(self.rating_0, self.rating_1)
+                print("model0 won")
+                self.rating_0, self.rating_1 = self.update_rating_win_loss(self.rating_0, self.rating_1)
             elif sum(as_1) > sum(as_0):
-                self.rating_1, self.rating_0 = self.update_rating(self.rating_1, self.rating_0)
+                print("model1 won")
+                self.rating_1, self.rating_0 = self.update_rating_win_loss(self.rating_1, self.rating_0)
             elif sum(as_0) == sum(as_1):
+                print("draw")
                 self.rating_0, self.rating_1 = self.update_rating_draw(self.rating_0, self.rating_1)
 
             self.score_0, self.sigma_0 = self.rating_0
