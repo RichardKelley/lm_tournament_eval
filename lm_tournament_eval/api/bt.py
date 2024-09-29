@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy.optimize import minimize
 from lm_tournament_eval.score_database import ScoreDatabase
@@ -12,18 +13,20 @@ class BradleyTerryModel:
         self.hard_floor = 100
         self.model0_key = model0_key
         self.model1_key = model1_key
+        self.rank = int(os.environ.get('LOCAL_RANK',-1))
 
-        if self.db.check_model_exists(*model0_key):
-            self.score_0, _, _ = self.db.get_model_score(*model0_key)
-        else:
-            self.db.insert_model(*model0_key)
-            self.score_0 = 1200.0
-        
-        if self.db.check_model_exists(*model1_key):
-            self.score_1, _, _ = self.db.get_model_score(*model1_key)
-        else:
-            self.db.insert_model(*model1_key)
-            self.score_1 = 1200.0
+        if self.rank == 0 or self.rank == -1:
+            if self.db.check_model_exists(*model0_key):
+                self.score_0, _, _ = self.db.get_model_score(*model0_key)
+            else:
+                self.db.insert_model(*model0_key)
+                self.score_0 = 1200.0
+            
+            if self.db.check_model_exists(*model1_key):
+                self.score_1, _, _ = self.db.get_model_score(*model1_key)
+            else:
+                self.db.insert_model(*model1_key)
+                self.score_1 = 1200.0
 
         self.strengths = np.array([self.score_0, self.score_1])
         self.results = []

@@ -1,5 +1,5 @@
 # this is a collection of matches, models, and a schedule of "play"
-
+import os
 import logging
 import time
 import random
@@ -73,14 +73,15 @@ class Tournament:
                  tasks, 
                  task_manager, 
                  verbosity, 
-                 scheduler = None, 
-                 db : ScoreDatabase = None):
+                 scheduler, 
+                 db):
         self.config = config
         self.tasks = tasks
         self.task_manager = task_manager
         self.verbosity = verbosity
         self.scheduler = scheduler
         self.db = db
+        self.rank = int(os.environ.get('LOCAL_RANK',-1))
 
         # get model0_key
         model0_bpw = '16'
@@ -254,14 +255,15 @@ class Tournament:
                 logging.info(f"Current task: {task_name}")
                 self.scheduler.set_task_size(len(task_dict[task_name].eval_docs))
 
-                if not self.db.task_exists(task_name):
-                    task = task_dict[task_name]
-                    self.db.insert_task(task_name=task_name, 
-                                        output_type=task.config.output_type, 
-                                        num_instances=len(task.eval_docs))
+                if self.rank == 0 or self.rank == -1:
+                    if not self.db.task_exists(task_name):
+                        task = task_dict[task_name]
+                        self.db.insert_task(task_name=task_name, 
+                                            output_type=task.config.output_type, 
+                                            num_instances=len(task.eval_docs))
 
                 original_task = deepcopy(task_dict[task_name])
-                rank = 0
+
                 for match_schedule in self.scheduler:
                     logging.info(f"Current match indices: {match_schedule}")
 
@@ -274,7 +276,6 @@ class Tournament:
                                         batch_size=self.config.batch_size,
                                         device=self.config.device)        
 
-                    rank = model0._rank
                     requests0, padding_reqests0 = create_requests(model0, 
                                                                 task=subtask,
                                                                 limit=self.config.limit)
@@ -326,18 +327,16 @@ class Tournament:
                         torch.cuda.empty_cache()
                         torch.cuda.reset_peak_memory_stats()
 
-                    match_dict0 = results0['configs'][task_name]
-                    match_dict1 = results1['configs'][task_name]
-                    m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
-                    match_id = self.db.insert_match(m)
+                    if self.rank == 0 or self.rank == -1:
+                        match_dict0 = results0['configs'][task_name]
+                        match_dict1 = results1['configs'][task_name]
+                        m = Match(self.config.name, match_dict0, match_dict1, self.model0_key, self.model1_key, match_schedule)
+                        match_id = self.db.insert_match(m)
 
-                    self.db.update_instance_records(m, 
-                                                    results0["samples"][task_name], 
-                                                    results1["samples"][task_name])
+                        self.db.update_instance_records(m, 
+                                                        results0["samples"][task_name], 
+                                                        results1["samples"][task_name])
 
-                    rounds_per_task = []
-                    match_results = {}
-                    if rank == 0:
                         if self.config.ranking_system == "elo":
                             self.elo.online_elo_update(match_id=match_id, m=m, results0=results0, results1=results1)
                             self.db.set_model_score(*self.model0_key, self.elo.score_0)
