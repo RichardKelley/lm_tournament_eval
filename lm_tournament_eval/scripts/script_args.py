@@ -75,6 +75,7 @@ def setup_parser() -> argparse.ArgumentParser:
                         help="Whether to use bounded or unbounded elo updates. Default unbounded.")
     parser.add_argument("--k", type=int, default=10,
                         help="the scaling factor for elo")
+    parser.add_argument("--ranking_system", type=str, default="elo")
     return parser
 
 def setup_wandb(args) -> bool:

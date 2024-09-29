@@ -65,7 +65,12 @@ def run_roundrobin_eval():
     task_names = validate_tasks(args, task_manager)
     args = setup_trust_remote_code(args)
 
-    db = ScoreDatabase(args.db_path)
+    rank = int(os.environ.get('LOCAL_RANK',-1))
+
+    if rank == 0 or rank == -1:
+        db = ScoreDatabase(args.db_path)
+    else:
+        db = None
 
     filter_list = setup_filter_list(args=args, task_names=task_names)
     scheduler = setup_scheduler(args)
@@ -122,7 +127,8 @@ def run_roundrobin_eval():
                               fewshot_random_seed=args.fewshot_random_seed,
                               use_wandb=use_wandb,
                               elo_dynamics=args.elo_dynamics,
-                              k=args.k
+                              k=args.k,
+                              ranking_system=args.ranking_system
                              )
         
         tournament = Tournament(
@@ -133,7 +139,8 @@ def run_roundrobin_eval():
             scheduler,
             db=db)
 
-        db.record_tournament(tournament)
+        if rank == 0 or rank == -1:
+            db.record_tournament(tournament)
 
         tournament.run_tournament()
         pbar.update(1)
