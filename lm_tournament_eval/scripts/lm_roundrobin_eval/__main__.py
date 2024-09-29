@@ -127,6 +127,7 @@ def run_roundrobin_eval():
                               fewshot_random_seed=args.fewshot_random_seed,
                               use_wandb=use_wandb,
                               elo_dynamics=args.elo_dynamics,
+                              k=args.k,
                               ranking_system=args.ranking_system
                              )
         

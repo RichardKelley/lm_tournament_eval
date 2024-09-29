@@ -14,7 +14,7 @@ MAX_SCORE_DIFF = 800
 RATING_FLOOR = 100
 
 class ELO:
-    def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True):
+    def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True, k : int = 10):
         self.model0_key = model0_key
         self.model1_key = model1_key
         self.db = db
@@ -34,7 +34,7 @@ class ELO:
                 self.db.insert_model(*model1_key)
                 self.score_1 = 1200.0
 
-        self.k = 10
+        self.k = k
         self.soft_ceiling=3000
         self.decay_factor=0.01
 

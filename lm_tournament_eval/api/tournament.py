@@ -65,6 +65,7 @@ class TournamentConfig:
     fewshot_random_seed : int
     use_wandb : bool
     elo_dynamics : str
+    k : int
     ranking_system : str
 
 class Tournament:
@@ -117,7 +118,9 @@ class Tournament:
             self.elo = ELO(self.model0_key, 
                            self.model1_key, 
                            self.db,
-                           True if config.elo_dynamics == "unbounded" else False)
+                           True if config.elo_dynamics == "unbounded" else False,
+                           self.config.k
+                          )
         if self.config.ranking_system == "bt":
             self.bt = BradleyTerryModel(self.model0_key, 
                                         self.model1_key, 
