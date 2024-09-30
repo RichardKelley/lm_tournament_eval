@@ -1,3 +1,4 @@
+import os
 import math
 from .match import MatchResult, Match
 from typing import List, Dict
@@ -13,25 +14,27 @@ MAX_SCORE_DIFF = 800
 RATING_FLOOR = 100
 
 class ELO:
-    def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True):
+    def __init__(self, model0_key, model1_key, db : ScoreDatabase, unbounded : bool = True, k : int = 10):
         self.model0_key = model0_key
         self.model1_key = model1_key
         self.db = db
         self.unbounded = unbounded
+        self.rank = int(os.environ.get('LOCAL_RANK',-1))
 
-        if self.db.check_model_exists(*model0_key):
-            self.score_0 = self.db.get_model_score(*model0_key)
-        else:
-            self.db.insert_model(*model0_key)
-            self.score_0 = 1200.0
-        
-        if self.db.check_model_exists(*model1_key):
-            self.score_1 = self.db.get_model_score(*model1_key)
-        else:
-            self.db.insert_model(*model1_key)
-            self.score_1 = 1200.0
+        if self.rank == 0 or self.rank == -1:
+            if self.db.check_model_exists(*model0_key):
+                self.score_0, _, _ = self.db.get_model_score(*model0_key)
+            else:
+                self.db.insert_model(*model0_key)
+                self.score_0 = 1200.0
+            
+            if self.db.check_model_exists(*model1_key):
+                self.score_1, _, _ = self.db.get_model_score(*model1_key)
+            else:
+                self.db.insert_model(*model1_key)
+                self.score_1 = 1200.0
 
-        self.k = 10
+        self.k = k
         self.soft_ceiling=3000
         self.decay_factor=0.01
 
